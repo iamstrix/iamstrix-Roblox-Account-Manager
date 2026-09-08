@@ -1,4 +1,4 @@
-﻿using RBX_Alt_Manager.Classes;
+using RBX_Alt_Manager.Classes;
 using RBX_Alt_Manager.Forms;
 using System;
 using System.Collections.Generic;
@@ -67,6 +67,12 @@ namespace RBX_Alt_Manager
 
         private void AccountFields_FormClosing(object sender, FormClosingEventArgs e)
         {
+            foreach (Control control in FieldsPanel.Controls)
+            {
+                if (control is Field field)
+                    field.Save();
+            }
+
             e.Cancel = true;
             Hide();
         }

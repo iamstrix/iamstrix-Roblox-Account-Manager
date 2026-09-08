@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows.Forms;
 
 namespace RBX_Alt_Manager.Classes
@@ -22,6 +22,24 @@ namespace RBX_Alt_Manager.Classes
         {
             FieldBox.Text = FieldName;
             ValueBox.Text = FieldValue;
+
+            FieldBox.Leave += (s, ev) => Save();
+            ValueBox.Leave += (s, ev) => Save();
+        }
+
+        public void Save()
+        {
+            if (string.IsNullOrWhiteSpace(FieldBox.Text)) return;
+
+            if (FieldBox.Text != FieldName)
+            {
+                if (!string.IsNullOrEmpty(FieldName))
+                    account.RemoveField(FieldName);
+
+                FieldName = FieldBox.Text;
+            }
+
+            account.SetField(FieldBox.Text, ValueBox.Text);
         }
 
         private void Delete_Click(object sender, EventArgs e)
@@ -33,18 +51,9 @@ namespace RBX_Alt_Manager.Classes
 
         private void ValueBox_KeyPress(object sender, KeyPressEventArgs e)
         {
-            TextBox ValueBox = sender as TextBox;
-
             if (e.KeyChar == 13)
             {
-                if (FieldBox.Text != FieldName)
-                {
-                    account.RemoveField(FieldName);
-
-                    FieldName = FieldBox.Text;
-                }
-
-                account.SetField(FieldBox.Text, ValueBox.Text);
+                Save();
 
                 (FindForm() as AccountFields)?.FlashGreen();
             }

@@ -1,4 +1,4 @@
-﻿using RBX_Alt_Manager.Classes;
+using RBX_Alt_Manager.Classes;
 using RBX_Alt_Manager.Forms;
 
 namespace RBX_Alt_Manager
@@ -119,6 +119,7 @@ namespace RBX_Alt_Manager
             this.CloseRbxWindowTitleCB = new System.Windows.Forms.CheckBox();
             this.RbxWindowNameTB = new System.Windows.Forms.TextBox();
             this.SaveWindowPositionsCB = new System.Windows.Forms.CheckBox();
+            this.TrimAltsMemoryCB = new System.Windows.Forms.CheckBox();
             this.ServerListStrip.SuspendLayout();
             this.GamesStrip.SuspendLayout();
             this.FavoritesStrip.SuspendLayout();
@@ -841,6 +842,7 @@ namespace RBX_Alt_Manager
             this.WatcherPanel.Controls.Add(this.TimeoutNum);
             this.WatcherPanel.Controls.Add(this.ConnectionSecondsLabel);
             this.WatcherPanel.Controls.Add(this.SaveWindowPositionsCB);
+            this.WatcherPanel.Controls.Add(this.TrimAltsMemoryCB);
             this.WatcherPanel.Controls.Add(this.VerifyDataModelCB);
             this.WatcherPanel.Controls.Add(this.IgnoreExistingProcesses);
             this.WatcherPanel.Controls.Add(this.RbxMemoryCB);
@@ -1090,6 +1092,19 @@ namespace RBX_Alt_Manager
             this.SaveWindowPositionsCB.UseVisualStyleBackColor = true;
             this.SaveWindowPositionsCB.CheckedChanged += new System.EventHandler(this.SaveWindowPositionsCB_CheckedChanged);
             // 
+            // TrimAltsMemoryCB
+            // 
+            this.TrimAltsMemoryCB.AutoSize = true;
+            this.WatcherPanel.SetFlowBreak(this.TrimAltsMemoryCB, true);
+            this.TrimAltsMemoryCB.Location = new System.Drawing.Point(11, 155);
+            this.TrimAltsMemoryCB.Name = "TrimAltsMemoryCB";
+            this.TrimAltsMemoryCB.Size = new System.Drawing.Size(225, 17);
+            this.TrimAltsMemoryCB.TabIndex = 17;
+            this.TrimAltsMemoryCB.Text = "Trim Alts Memory (Excludes \'Main\' Group)";
+            this.OPITip.SetToolTip(this.TrimAltsMemoryCB, "Periodically trims physical working set memory on background Roblox instances.\r\nAccounts in the \'Main\' group and the active foreground window are strictly protected.");
+            this.TrimAltsMemoryCB.UseVisualStyleBackColor = true;
+            this.TrimAltsMemoryCB.CheckedChanged += new System.EventHandler(this.TrimAltsMemoryCB_CheckedChanged);
+            // 
             // ServerList
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -1221,5 +1236,6 @@ namespace RBX_Alt_Manager
         private System.Windows.Forms.Label ConnectionSecondsLabel;
         private System.Windows.Forms.Button OpenLogsButton;
         private System.Windows.Forms.CheckBox SaveWindowPositionsCB;
+        private System.Windows.Forms.CheckBox TrimAltsMemoryCB;
     }
 }

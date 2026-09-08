@@ -1,4 +1,4 @@
-﻿#pragma warning disable CS4014
+#pragma warning disable CS4014
 
 using BrightIdeasSoftware;
 using Newtonsoft.Json;
@@ -47,6 +47,8 @@ namespace RBX_Alt_Manager
             ExitIfBetaDetectedCB.Checked = AccountManager.Watcher.Get<bool>("ExitOnBeta");
             ExitIfNoConnectionCB.Checked = AccountManager.Watcher.Get<bool>("ExitIfNoConnection");
             SaveWindowPositionsCB.Checked = AccountManager.Watcher.Get<bool>("SaveWindowPositions");
+            TrimAltsMemoryCB.Checked = AccountManager.Watcher.Get<bool>("TrimAltsMemory");
+            RobloxWatcher.AutoTrimAltsMemory = TrimAltsMemoryCB.Checked;
             VerifyDataModelCB.Checked = AccountManager.Watcher.Get<bool>("VerifyDataModel");
             IgnoreExistingProcesses.Checked = AccountManager.Watcher.Get<bool>("IgnoreExistingProcesses");
             CloseRbxWindowTitleCB.Checked = AccountManager.Watcher.Get<bool>("CloseRbxWindowTitle");
@@ -954,6 +956,14 @@ namespace RBX_Alt_Manager
             RobloxWatcher.RememberWindowPositions = SaveWindowPositionsCB.Checked;
 
             AccountManager.Watcher.Set("SaveWindowPositions", SaveWindowPositionsCB.Checked ? "true" : "false");
+            AccountManager.IniSettings.Save("RAMSettings.ini");
+        }
+
+        private void TrimAltsMemoryCB_CheckedChanged(object sender, EventArgs e)
+        {
+            RobloxWatcher.AutoTrimAltsMemory = TrimAltsMemoryCB.Checked;
+
+            AccountManager.Watcher.Set("TrimAltsMemory", TrimAltsMemoryCB.Checked ? "true" : "false");
             AccountManager.IniSettings.Save("RAMSettings.ini");
         }
 

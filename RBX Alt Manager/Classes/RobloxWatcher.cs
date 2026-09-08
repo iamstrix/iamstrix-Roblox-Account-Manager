@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -27,6 +27,9 @@ namespace RBX_Alt_Manager.Classes
             public int Bottom;
         }
 
+        [DllImport("psapi.dll", SetLastError = true)]
+        public static extern bool EmptyWorkingSet(IntPtr hProcess);
+
         public static readonly string HandlePath = Path.Combine(Environment.CurrentDirectory, "handle.bin");
 
         public static HashSet<int> Seen = new HashSet<int>();
@@ -36,6 +39,7 @@ namespace RBX_Alt_Manager.Classes
         public static bool CloseIfMemoryLow = false;
         public static bool CloseIfWindowTitle = false;
         public static bool RememberWindowPositions = false;
+        public static bool AutoTrimAltsMemory = false;
         public static int MemoryLowValue = 200;
         public static string ExpectedWindowTitle = "Roblox";
 
@@ -71,7 +75,20 @@ namespace RBX_Alt_Manager.Classes
                 // This ignores the second roblox process which would cause 268 (Unexpected client behavior) kicks if it were closed.
                 if (string.IsNullOrEmpty(CommandLine)) continue; // Roblox's second process
                 if (CommandLine.StartsWith("\\??\\")) continue; // Roblox's second process
-                if (!CommandLine.Contains("-t ") && !CommandLine.Contains("-j ")) continue; // Check if this process was ran with an authentcation token and a joinScript
+                if (CommandLine.Contains("--launch-to-tray")) continue; // Roblox background helper
+
+                var TrackerMatch = Regex.Match(CommandLine, @"\-b (\d+)");
+                string TrackerID = TrackerMatch.Success ? TrackerMatch.Groups[1].Value : string.Empty;
+
+                Account account = null;
+                if (!string.IsNullOrEmpty(TrackerID))
+                    account = AccountManager.AccountsList.FirstOrDefault(a => a.BrowserTrackerID == TrackerID);
+                if (account == null)
+                    account = AccountManager.AccountsList.FirstOrDefault(a => a.ProcessId == process.Id);
+
+                // If not ran with -t/-j, only proceed if this process is known to RAM or has a main window
+                if (!CommandLine.Contains("-t ") && !CommandLine.Contains("-j ") && account == null && process.MainWindowHandle == IntPtr.Zero)
+                    continue;
 
                 try
                 {
@@ -82,17 +99,31 @@ namespace RBX_Alt_Manager.Classes
 
                         if (CloseIfWindowTitle && process.MainWindowTitle != ExpectedWindowTitle)
                             Kill($"Window Title isn't {ExpectedWindowTitle}, got {process.MainWindowTitle}");
+
+                        if (AutoTrimAltsMemory)
+                        {
+                            bool isMain = account != null && !string.IsNullOrEmpty(account.Group) && account.Group.Equals("Main", StringComparison.OrdinalIgnoreCase);
+                            if (!isMain)
+                            {
+                                try
+                                {
+                                    EmptyWorkingSet(process.Handle);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Program.Logger.Error($"Error trimming working set for PID {process.Id}: {ex.Message}");
+                                }
+                            }
+                        }
                     }
                 }
                 catch (Exception x) { Program.Logger.Error($"Error with checking for Memory & Window Title: {x.Message}\n{x.StackTrace}"); }
 
-                if (RememberWindowPositions && (DateTime.Now - process.StartTime).TotalSeconds > 30)
+                if (RememberWindowPositions && (DateTime.Now - process.StartTime).TotalSeconds > 30 && account != null)
                 {
-                    var TrackerMatch = Regex.Match(CommandLine, @"\-b (\d+)");
-                    string TrackerID = TrackerMatch.Success ? TrackerMatch.Groups[1].Value : string.Empty;
-
-                    if (AccountManager.AccountsList.FirstOrDefault(Account => Account.BrowserTrackerID == TrackerID) is Account account)
-                        try
+                    try
+                    {
+                        if (process.MainWindowHandle != IntPtr.Zero)
                         {
                             GetWindowRect(process.MainWindowHandle, out RECT rect);
 
@@ -101,7 +132,8 @@ namespace RBX_Alt_Manager.Classes
                             account.SetField("Window_Width", $"{rect.Right - rect.Left:0}");
                             account.SetField("Window_Height", $"{rect.Bottom - rect.Top:0}");
                         }
-                        catch { }
+                    }
+                    catch { }
                 }
 
                 if (Seen.Contains(process.Id)) continue;

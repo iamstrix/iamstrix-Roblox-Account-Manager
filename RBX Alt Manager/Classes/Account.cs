@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RBX_Alt_Manager.Classes;
 using RBX_Alt_Manager.Forms;
@@ -35,6 +35,8 @@ namespace RBX_Alt_Manager
         [JsonIgnore] public DateTime LastAppLaunch;
         [JsonIgnore] public string CSRFToken;
         [JsonIgnore] public UserPresence Presence;
+        [JsonIgnore] public int ProcessId;
+        [JsonIgnore] public DateTime LastLaunchTime;
 
         [DllImport("user32.dll", SetLastError = true)]
         static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
@@ -654,6 +656,7 @@ namespace RBX_Alt_Manager
                                 LaunchInfo.FileName = $"roblox-player:1+launchmode:play+gameinfo:{Ticket}+launchtime:{LaunchTime}+placelauncherurl:{HttpUtility.UrlEncode($"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestFollowUser&userId={PlaceID}")}+browsertrackerid:{BrowserTrackerID}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
                             else
                                 LaunchInfo.FileName = $"roblox-player:1+launchmode:play+gameinfo:{Ticket}+launchtime:{LaunchTime}+placelauncherurl:{HttpUtility.UrlEncode($"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGame{(string.IsNullOrEmpty(JobID) ? "" : "Job")}&browserTrackerId={BrowserTrackerID}&placeId={PlaceID}{(string.IsNullOrEmpty(JobID) ? "" : ("&gameId=" + JobID))}&isPlayTogetherGame=false{(AccountManager.IsTeleport ? "&isTeleport=true" : "")}")}+browsertrackerid:{BrowserTrackerID}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
+                            LastLaunchTime = DateTime.Now;
                             Process Launcher = Process.Start(LaunchInfo);
                             
                             Launcher.WaitForExit();
@@ -679,40 +682,63 @@ namespace RBX_Alt_Manager
 
         public async void AdjustWindowPosition()
         {
-            if (!RobloxWatcher.RememberWindowPositions)
-                return;
-
-            if (!(int.TryParse(GetField("Window_Position_X"), out int PosX) && int.TryParse(GetField("Window_Position_Y"), out int PosY) && int.TryParse(GetField("Window_Width"), out int Width) && int.TryParse(GetField("Window_Height"), out int Height)))
-                return;
+            int PosX = 0, PosY = 0, Width = 0, Height = 0;
+            bool hasPositions = RobloxWatcher.RememberWindowPositions &&
+                int.TryParse(GetField("Window_Position_X"), out PosX) &&
+                int.TryParse(GetField("Window_Position_Y"), out PosY) &&
+                int.TryParse(GetField("Window_Width"), out Width) &&
+                int.TryParse(GetField("Window_Height"), out Height);
 
             bool Found = false;
             DateTime Ends = DateTime.Now.AddSeconds(45);
 
             while (true)
             {
-                await Task.Delay(350);
+                await Task.Delay(500);
 
                 foreach (var process in Process.GetProcessesByName("RobloxPlayerBeta").Reverse())
                 {
-                    if (process.MainWindowHandle == IntPtr.Zero) continue;
+                    try
+                    {
+                        if (process.HasExited) continue;
 
-                    string CommandLine = process.GetCommandLine();
+                        string CommandLine = process.GetCommandLine();
+                        string TrackerID = string.Empty;
+                        if (!string.IsNullOrEmpty(CommandLine))
+                        {
+                            var TrackerMatch = Regex.Match(CommandLine, @"\-b (\d+)");
+                            if (TrackerMatch.Success) TrackerID = TrackerMatch.Groups[1].Value;
+                        }
 
-                    var TrackerMatch = Regex.Match(CommandLine, @"\-b (\d+)");
-                    string TrackerID = TrackerMatch.Success ? TrackerMatch.Groups[1].Value : string.Empty;
+                        bool match = false;
+                        if (!string.IsNullOrEmpty(TrackerID) && !string.IsNullOrEmpty(BrowserTrackerID))
+                        {
+                            match = (TrackerID == BrowserTrackerID);
+                        }
+                        else if (LastLaunchTime != default && (DateTime.Now - process.StartTime).TotalSeconds < 60)
+                        {
+                            bool alreadyClaimed = AccountManager.AccountsList.Any(a => a != this && a.ProcessId == process.Id);
+                            if (!alreadyClaimed)
+                                match = true;
+                        }
 
-                    if (TrackerID != BrowserTrackerID) continue;
+                        if (match)
+                        {
+                            ProcessId = process.Id;
+                            Found = true;
 
-                    Found = true;
+                            if (hasPositions && process.MainWindowHandle != IntPtr.Zero)
+                            {
+                                MoveWindow(process.MainWindowHandle, PosX, PosY, Width, Height, true);
+                            }
 
-                    MoveWindow(process.MainWindowHandle, PosX, PosY, Width, Height, true);
-
-                    break;
+                            break;
+                        }
+                    }
+                    catch { }
                 }
 
-                if (Found) break;
-
-                if (DateTime.Now > Ends) break;
+                if (Found || DateTime.Now > Ends) break;
             }
         }
 
