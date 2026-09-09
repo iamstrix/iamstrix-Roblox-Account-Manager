@@ -1,0 +1,10 @@
+{
+  "DFIntTextureQualityOverride": "1",
+  "FIntRenderShadowIntensity": "0",
+  "FFlagDisablePostFx": "True",
+  "FIntFRMMinGrassDistance": "0",
+  "FIntFRMMaxGrassDistance": "0",
+  "FIntRenderLocalLightUpdatesMax": "1",
+  "FIntRenderLocalLightUpdatesMin": "1",
+  "DFIntTaskSchedulerTargetFps": "15"
+}

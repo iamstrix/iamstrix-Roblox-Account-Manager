@@ -1761,6 +1761,8 @@ namespace RBX_Alt_Manager
 
         private void copyGroupToolStripMenuItem_Click(object sender, EventArgs e) => Clipboard.SetText(SelectedAccount?.Group ?? "No Account Selected");
 
+        private void openFastFlagsFolderToolStripMenuItem_Click(object sender, EventArgs e) => ClientSettingsPatcher.OpenFastFlagsFolder();
+
         private void copyAppLinkToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (SelectedAccount == null) return;

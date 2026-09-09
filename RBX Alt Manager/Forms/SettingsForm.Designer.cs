@@ -1,4 +1,4 @@
-﻿
+
 using RBX_Alt_Manager.Classes;
 
 namespace RBX_Alt_Manager.Forms
@@ -77,6 +77,8 @@ namespace RBX_Alt_Manager.Forms
             this.FPSCapLabel = new System.Windows.Forms.Label();
             this.MaxFPSValue = new System.Windows.Forms.NumericUpDown();
             this.OverrideWithCustomCB = new System.Windows.Forms.CheckBox();
+            this.GroupFastFlagsCB = new System.Windows.Forms.CheckBox();
+            this.OpenFastFlagsButton = new System.Windows.Forms.Button();
             this.CustomClientSettingsDialog = new System.Windows.Forms.OpenFileDialog();
             this.ForceUpdateButton = new System.Windows.Forms.Button();
             this.SettingsLayoutPanel.SuspendLayout();
@@ -588,6 +590,8 @@ namespace RBX_Alt_Manager.Forms
             this.MiscellaneousFlowPanel.Controls.Add(this.FPSCapLabel);
             this.MiscellaneousFlowPanel.Controls.Add(this.MaxFPSValue);
             this.MiscellaneousFlowPanel.Controls.Add(this.OverrideWithCustomCB);
+            this.MiscellaneousFlowPanel.Controls.Add(this.GroupFastFlagsCB);
+            this.MiscellaneousFlowPanel.Controls.Add(this.OpenFastFlagsButton);
             this.MiscellaneousFlowPanel.Controls.Add(this.ForceUpdateButton);
             this.MiscellaneousFlowPanel.Dock = System.Windows.Forms.DockStyle.Fill;
             this.MiscellaneousFlowPanel.Location = new System.Drawing.Point(3, 3);
@@ -703,6 +707,28 @@ namespace RBX_Alt_Manager.Forms
             this.OverrideWithCustomCB.UseVisualStyleBackColor = true;
             this.OverrideWithCustomCB.CheckedChanged += new System.EventHandler(this.OverrideWithCustomCB_CheckedChanged);
             // 
+            // GroupFastFlagsCB
+            // 
+            this.GroupFastFlagsCB.AutoSize = true;
+            this.GroupFastFlagsCB.Location = new System.Drawing.Point(15, 84);
+            this.GroupFastFlagsCB.Margin = new System.Windows.Forms.Padding(3, 3, 60, 3);
+            this.GroupFastFlagsCB.Name = "GroupFastFlagsCB";
+            this.GroupFastFlagsCB.Size = new System.Drawing.Size(160, 17);
+            this.GroupFastFlagsCB.TabIndex = 13;
+            this.GroupFastFlagsCB.Text = "Group-Based FastFlags";
+            this.GroupFastFlagsCB.UseVisualStyleBackColor = true;
+            this.GroupFastFlagsCB.CheckedChanged += new System.EventHandler(this.GroupFastFlagsCB_CheckedChanged);
+            // 
+            // OpenFastFlagsButton
+            // 
+            this.OpenFastFlagsButton.Location = new System.Drawing.Point(15, 107);
+            this.OpenFastFlagsButton.Name = "OpenFastFlagsButton";
+            this.OpenFastFlagsButton.Size = new System.Drawing.Size(269, 23);
+            this.OpenFastFlagsButton.TabIndex = 14;
+            this.OpenFastFlagsButton.Text = "Open FastFlags Folder";
+            this.OpenFastFlagsButton.UseVisualStyleBackColor = true;
+            this.OpenFastFlagsButton.Click += new System.EventHandler(this.OpenFastFlagsButton_Click);
+            // 
             // CustomClientSettingsDialog
             // 
             this.CustomClientSettingsDialog.DefaultExt = "json";
@@ -798,6 +824,8 @@ namespace RBX_Alt_Manager.Forms
         private System.Windows.Forms.NumericUpDown PresenceUpdateRateNum;
         private System.Windows.Forms.OpenFileDialog CustomClientSettingsDialog;
         private System.Windows.Forms.CheckBox AutoCookieRefreshCB;
+        private System.Windows.Forms.CheckBox GroupFastFlagsCB;
+        private System.Windows.Forms.Button OpenFastFlagsButton;
         private System.Windows.Forms.Button ForceUpdateButton;
     }
 }

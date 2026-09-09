@@ -1,4 +1,4 @@
-﻿using RBX_Alt_Manager.Classes;
+using RBX_Alt_Manager.Classes;
 
 namespace RBX_Alt_Manager
 {
@@ -60,6 +60,7 @@ namespace RBX_Alt_Manager
             this.toggleToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.moveToToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.copyGroupToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.openFastFlagsFolderToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.infoToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.groupsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.infoToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
@@ -356,7 +357,8 @@ namespace RBX_Alt_Manager
             this.moveGroupUpToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.toggleToolStripMenuItem,
             this.moveToToolStripMenuItem,
-            this.copyGroupToolStripMenuItem});
+            this.copyGroupToolStripMenuItem,
+            this.openFastFlagsFolderToolStripMenuItem});
             this.moveGroupUpToolStripMenuItem.Name = "moveGroupUpToolStripMenuItem";
             this.moveGroupUpToolStripMenuItem.Size = new System.Drawing.Size(208, 22);
             this.moveGroupUpToolStripMenuItem.Text = "Groups";
@@ -381,6 +383,13 @@ namespace RBX_Alt_Manager
             this.copyGroupToolStripMenuItem.Size = new System.Drawing.Size(167, 22);
             this.copyGroupToolStripMenuItem.Text = "Copy Group";
             this.copyGroupToolStripMenuItem.Click += new System.EventHandler(this.copyGroupToolStripMenuItem_Click);
+            // 
+            // openFastFlagsFolderToolStripMenuItem
+            // 
+            this.openFastFlagsFolderToolStripMenuItem.Name = "openFastFlagsFolderToolStripMenuItem";
+            this.openFastFlagsFolderToolStripMenuItem.Size = new System.Drawing.Size(190, 22);
+            this.openFastFlagsFolderToolStripMenuItem.Text = "Open FastFlags Folder";
+            this.openFastFlagsFolderToolStripMenuItem.Click += new System.EventHandler(this.openFastFlagsFolderToolStripMenuItem_Click);
             // 
             // infoToolStripMenuItem
             // 
@@ -1171,6 +1180,7 @@ namespace RBX_Alt_Manager
         private System.Windows.Forms.PictureBox HistoryIcon;
         private BrightIdeasSoftware.OLVColumn LastUsedColumn;
         private System.Windows.Forms.ToolStripMenuItem copyGroupToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem openFastFlagsFolderToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem copyUserPassComboToolStripMenuItem;
         private System.Windows.Forms.PictureBox ShuffleIcon;
         private System.Windows.Forms.ToolStripMenuItem ShowDetailsToolStripMenuItem;

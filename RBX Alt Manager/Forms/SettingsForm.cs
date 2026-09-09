@@ -1,10 +1,11 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using RBX_Alt_Manager.Classes;
 
 namespace RBX_Alt_Manager.Forms
 {
@@ -56,6 +57,8 @@ namespace RBX_Alt_Manager.Forms
                 OverrideWithCustomCB.Checked = true;
                 UnlockFPSCB.Enabled = false;
             }
+
+            GroupFastFlagsCB.Checked = AccountManager.General.Get<bool>("GroupFastFlags");
 
             try { StartupKey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true); } catch { }
 
@@ -351,6 +354,19 @@ namespace RBX_Alt_Manager.Forms
                 Remove();
             
             AccountManager.IniSettings.Save("RAMSettings.ini");
+        }
+
+        private void GroupFastFlagsCB_CheckedChanged(object sender, EventArgs e)
+        {
+            if (!SettingsLoaded) return;
+
+            AccountManager.General.Set("GroupFastFlags", GroupFastFlagsCB.Checked ? "true" : "false");
+            AccountManager.IniSettings.Save("RAMSettings.ini");
+        }
+
+        private void OpenFastFlagsButton_Click(object sender, EventArgs e)
+        {
+            ClientSettingsPatcher.OpenFastFlagsFolder();
         }
 
         private void ForceUpdateButton_Click(object sender, EventArgs e)
