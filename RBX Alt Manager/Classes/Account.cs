@@ -117,7 +117,7 @@ namespace RBX_Alt_Manager
 
             if (!GetCSRFToken(out string Token)) return false;
 
-            RestRequest request = MakeRequest("/v1/authentication-ticket/", Method.Post).AddHeader("X-CSRF-TOKEN", Token).AddHeader("Referer", "https://www.roblox.com/games/4924922222/Brookhaven-RP");
+            RestRequest request = MakeRequest("/v1/authentication-ticket/", Method.Post).AddHeader("X-CSRF-TOKEN", Token).AddHeader("Referer", "https://www.roblox.com/games/4924922222/Brookhaven-RP").AddHeader("Content-Type", "application/json").AddStringBody("{}", DataFormat.Json);
 
             RestResponse response = AccountManager.AuthClient.Execute(request);
 
@@ -126,10 +126,10 @@ namespace RBX_Alt_Manager
             if (TicketHeader != null)
             {
                 Ticket = (string)TicketHeader.Value;
-
                 return true;
             }
 
+            Program.Logger.Error($"GetAuthTicket failed. Status: {response.StatusCode} | Content: {response.Content}");
             return false;
         }
 
@@ -142,6 +142,7 @@ namespace RBX_Alt_Manager
             if (response.StatusCode != HttpStatusCode.Forbidden)
             {
                 Result = $"[{(int)response.StatusCode} {response.StatusCode}] {response.Content}";
+                Program.Logger.Error($"GetCSRFToken failed. Expected Forbidden (403), got {response.StatusCode}. Content: {response.Content}");
                 return false;
             }
 
@@ -513,7 +514,7 @@ namespace RBX_Alt_Manager
                 BrowserTrackerID = r.Next(100000, 175000).ToString() + r.Next(100000, 900000).ToString(); // oh god this is ugly
             }
 
-            try { ClientSettingsPatcher.PatchSettings(this); } catch (Exception Ex) { Program.Logger.Error($"Failed to patch ClientAppSettings: {Ex}"); }
+
 
             if (!GetCSRFToken(out string Token)) return $"ERROR: Account Session Expired, re-add the account or try again. (Invalid X-CSRF-Token)\n{Token}";
 
@@ -528,8 +529,7 @@ namespace RBX_Alt_Manager
                     {
                         foreach(Process proc in Process.GetProcessesByName("RobloxPlayerBeta"))
                         {
-                            var TrackerMatch = Regex.Match(proc.GetCommandLine(), @"\-b (\d+)");
-                            string TrackerID = TrackerMatch.Success ? TrackerMatch.Groups[1].Value : string.Empty;
+                            string TrackerID = Utilities.GetBrowserTrackerId(proc.GetCommandLine());
 
                             if (TrackerID == BrowserTrackerID)
                             {
@@ -644,35 +644,26 @@ namespace RBX_Alt_Manager
                 }
                 else
                 {
-                    await Task.Run(() => // prevents roblox launcher hanging our main process
+                    string placeLauncherUrl;
+                    if (JoinVIP)
+                        placeLauncherUrl = $"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestPrivateGame&placeId={PlaceID}&accessCode={AccessCode}&linkCode={LinkCode}";
+                    else if (FollowUser)
+                        placeLauncherUrl = $"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestFollowUser&userId={PlaceID}";
+                    else
+                        placeLauncherUrl = $"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGame{(string.IsNullOrEmpty(JobID) ? "" : "Job")}&browserTrackerId={BrowserTrackerID}&placeId={PlaceID}{(string.IsNullOrEmpty(JobID) ? "" : ("&gameId=" + JobID))}&isPlayTogetherGame=false{(AccountManager.IsTeleport ? "&isTeleport=true" : "")}";
+                    string launchUri = $"roblox-player:1+launchmode:play+gameinfo:{Ticket}+launchtime:{LaunchTime}+placelauncherurl:{HttpUtility.UrlEncode(placeLauncherUrl)}+browsertrackerid:{BrowserTrackerID}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
+                    try
                     {
-                        try
-                        {
-                            ProcessStartInfo LaunchInfo = new ProcessStartInfo();
-
-                            if (JoinVIP)
-                                LaunchInfo.FileName = $"roblox-player:1+launchmode:play+gameinfo:{Ticket}+launchtime:{LaunchTime}+placelauncherurl:{HttpUtility.UrlEncode($"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestPrivateGame&placeId={PlaceID}&accessCode={AccessCode}&linkCode={LinkCode}")}+browsertrackerid:{BrowserTrackerID}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
-                            else if (FollowUser)
-                                LaunchInfo.FileName = $"roblox-player:1+launchmode:play+gameinfo:{Ticket}+launchtime:{LaunchTime}+placelauncherurl:{HttpUtility.UrlEncode($"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestFollowUser&userId={PlaceID}")}+browsertrackerid:{BrowserTrackerID}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
-                            else
-                                LaunchInfo.FileName = $"roblox-player:1+launchmode:play+gameinfo:{Ticket}+launchtime:{LaunchTime}+placelauncherurl:{HttpUtility.UrlEncode($"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGame{(string.IsNullOrEmpty(JobID) ? "" : "Job")}&browserTrackerId={BrowserTrackerID}&placeId={PlaceID}{(string.IsNullOrEmpty(JobID) ? "" : ("&gameId=" + JobID))}&isPlayTogetherGame=false{(AccountManager.IsTeleport ? "&isTeleport=true" : "")}")}+browsertrackerid:{BrowserTrackerID}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
-                            LastLaunchTime = DateTime.Now;
-                            Process Launcher = Process.Start(LaunchInfo);
-                            
-                            Launcher.WaitForExit();
-
-                            AccountManager.Instance.NextAccount();
-
-                            _ = Task.Run(AdjustWindowPosition);
-                        }
-                        catch (Exception x)
-                        {
-                            Utilities.InvokeIfRequired(AccountManager.Instance, () => MessageBox.Show($"ERROR: Failed to launch Roblox! Try re-installing Roblox.\n\n{x.Message}{x.StackTrace}", "Roblox Account Manager", MessageBoxButtons.OK, MessageBoxIcon.Error));
-                            AccountManager.Instance.CancelLaunching();
-                            AccountManager.Instance.NextAccount();
-                        }
-                    });
-
+                        await Task.Run(() => ClientProfiles.LaunchAsync(this, launchUri));
+                    }
+                    catch (Exception x)
+                    {
+                        Program.Logger.Error($"[FastFlags] Launch failed: {x.Message}");
+                        Utilities.InvokeIfRequired(AccountManager.Instance, () => MessageBox.Show($"Failed to launch Roblox: {x.Message}", "Roblox Account Manager", MessageBoxButtons.OK, MessageBoxIcon.Error));
+                        AccountManager.Instance.CancelLaunching();
+                        AccountManager.Instance.NextAccount();
+                        return "ERROR: Failed to launch Roblox";
+                    }
                     return "Success";
                 }
             }
@@ -688,6 +679,13 @@ namespace RBX_Alt_Manager
                 int.TryParse(GetField("Window_Position_Y"), out PosY) &&
                 int.TryParse(GetField("Window_Width"), out Width) &&
                 int.TryParse(GetField("Window_Height"), out Height);
+
+            if (!hasPositions && ClientProfiles.GetRole(this) == ClientRole.Alt)
+            {
+                Width = AccountManager.General.Get<int>("AltWindowWidth");
+                Height = AccountManager.General.Get<int>("AltWindowHeight");
+                hasPositions = Width > 0 && Height > 0;
+            }
 
             bool Found = false;
             DateTime Ends = DateTime.Now.AddSeconds(45);
@@ -706,8 +704,7 @@ namespace RBX_Alt_Manager
                         string TrackerID = string.Empty;
                         if (!string.IsNullOrEmpty(CommandLine))
                         {
-                            var TrackerMatch = Regex.Match(CommandLine, @"\-b (\d+)");
-                            if (TrackerMatch.Success) TrackerID = TrackerMatch.Groups[1].Value;
+                            TrackerID = Utilities.GetBrowserTrackerId(CommandLine);
                         }
 
                         bool match = false;
@@ -715,7 +712,7 @@ namespace RBX_Alt_Manager
                         {
                             match = (TrackerID == BrowserTrackerID);
                         }
-                        else if (LastLaunchTime != default && (DateTime.Now - process.StartTime).TotalSeconds < 60)
+                        else if (LastLaunchTime != default && process.StartTime >= LastLaunchTime.AddSeconds(-1) && (DateTime.Now - process.StartTime).TotalSeconds < 60)
                         {
                             bool alreadyClaimed = AccountManager.AccountsList.Any(a => a != this && a.ProcessId == process.Id);
                             if (!alreadyClaimed)
@@ -727,6 +724,7 @@ namespace RBX_Alt_Manager
                             ProcessId = process.Id;
                             Found = true;
 
+                            if (hasPositions && process.MainWindowHandle == IntPtr.Zero) { Found = false; continue; }
                             if (hasPositions && process.MainWindowHandle != IntPtr.Zero)
                             {
                                 MoveWindow(process.MainWindowHandle, PosX, PosY, Width, Height, true);

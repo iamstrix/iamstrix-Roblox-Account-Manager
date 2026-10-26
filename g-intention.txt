@@ -1,0 +1,54 @@
+# Intended Work Plan for Roblox Account Manager (RAM)
+
+## 1. Context & Repository Status
+- **Recent Progress**:
+  - Added "Auto Trim Alt Memory" toggle in `SettingsForm` (`SettingsForm.cs`, `SettingsForm.Designer.cs`, `AccountManager.cs`, `RobloxWatcher`).
+  - Patched `GetAuthTicket` endpoint payload in `Account.cs` to send `Content-Type: application/json` and `{}` body, matching Roblox's updated API requirements.
+- **Active Focus (Problem 1 in `log.txt`)**:
+  - The default Puppeteer login browser uses a barebones, outdated Chromium build (`Chrome/111.0.0.0`) and default automation flags.
+  - Roblox/Arkose Labs bot detection flags this instance, resulting in repeated 8-step FunCaptcha verification puzzles and 2FA prompts.
+
+---
+
+## 2. Planned Changes & Implementation Strategy
+
+### A. Browser Switch Feature (Brave / Chrome / Edge / Custom)
+1. **Settings UI (`SettingsForm.cs`, `SettingsForm.Designer.cs`)**:
+   - Add a "Login Browser" dropdown or file selector in the Settings dialog:
+     - Options: `Default (Bundled Chromium)`, `Brave`, `Google Chrome`, `Microsoft Edge`, `Custom Path`.
+   - Auto-detect common installation directories on Windows:
+     - Brave: `C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe` (or local AppData)
+     - Chrome: `C:\Program Files\Google\Chrome\Application\chrome.exe`
+     - Edge: `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`
+   - Store settings in `RAMSettings.ini` under `[General]` (`LoginBrowserType`, `CustomBrowserPath`).
+
+2. **Browser Launcher Integration (`AccountBrowser.cs`)**:
+   - Update `LaunchBrowser()` to resolve the executable path based on user settings.
+   - Supply `LaunchOptions.ExecutablePath` to PuppeteerSharp when using an external browser, bypassing `Fetcher.DownloadAsync()` for custom browsers.
+
+---
+
+### B. Anti-Detection & Bot Mitigation Hardening
+Switching to Brave or Chrome addresses the binary mismatch, but Arkose Labs also detects CDP (Chrome DevTools Protocol) automation flags. We intend to apply the following mitigations in `AccountBrowser.cs`:
+
+1. **Automation Flag Stripping**:
+   - Pass `--disable-blink-features=AutomationControlled` to remove the default `window.navigator.webdriver` indicator.
+   - Remove `--disable-web-security` unless strictly required, as it creates security anomalies flagged by bot-detection heuristics.
+   - Filter out automation-specific command-line arguments.
+
+2. **User-Agent Modernization**:
+   - Replace the obsolete hardcoded User-Agent (`Chrome/111.0.0.0`) with a modern, dynamically generated or updated User-Agent matching the active browser engine version.
+
+3. **Persistent User Data Profile (Optional / Toggleable)**:
+   - Provide an option to use a dedicated, persistent profile directory (`UserDataDir`) in `RAM\BrowserProfile` instead of a disposable clean session each time.
+   - Legitimate session cookies, cache, and GPU fingerprints persist across launches, drastically lowering Arkose risk scores.
+
+---
+
+## 3. Execution Sequence
+1. **Update Settings**: Add UI controls and INI read/write logic for browser preference.
+2. **Refactor `AccountBrowser.cs`**:
+   - Implement `GetBrowserExecutablePath()`.
+   - Update `LaunchOptions` and stealth argument list.
+   - Modernize User-Agent string.
+3. **Build & Verify**: Compile the solution and verify clean startup and settings persistence.

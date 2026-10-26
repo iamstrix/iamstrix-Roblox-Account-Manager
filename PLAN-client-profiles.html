@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plan: Low-graphics alt client + normal main client (RAM x Bloxstrap)</title>
+</head>
+<body>
+
+<h1>Plan: Low-graphics alt client + normal main client (RAM x Bloxstrap)</h1>
+<p>Executor: Codex. Planner notes are based on the repo at <code>b7c7055</code> plus the <strong>uncommitted</strong> FastFlags work in the working tree (do not revert it &mdash; it is the base for this plan).</p>
+
+<details open>
+<summary><strong>Goal</strong></summary>
+<ul>
+  <li>Accounts in "alt" groups launch on an <strong>extremely low-graphics Roblox client</strong>.</li>
+  <li>Only the <strong>main</strong> account launches on a <strong>normal-graphics client</strong> (the user's own Bloxstrap setup, untouched).</li>
+  <li>RAM and Bloxstrap cooperate: RAM detects Bloxstrap, reads its version/paths, never pollutes the user's Bloxstrap flags, and falls back to Bloxstrap's launch path whenever it must.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>Facts verified on the user's machine (2026-10-24)</strong></summary>
+<table border="1" cellpadding="6" cellspacing="0">
+  <tr><th>Fact</th><th>Consequence</th></tr>
+  <tr>
+    <td><code>HKCR\roblox-player\shell\open\command</code> = <code>"%LocalAppData%\Bloxstrap\Bloxstrap.exe" -player "%1"</code>, Bloxstrap <strong>2.11.4</strong></td>
+    <td>RAM's protocol launch goes through Bloxstrap.</td>
+  </tr>
+  <tr>
+    <td>Bloxstrap log: every launch logs <code>ClientSettings\ClientAppSettings.json has been copied to the version folder</code></td>
+    <td>Whatever is in <code>Bloxstrap\Modifications\ClientSettings\ClientAppSettings.json</code> at launch time is what that client gets.</td>
+  </tr>
+  <tr>
+    <td>Bloxstrap bootstrapper exits ~5 s after <code>Started Roblox</code>; activity tracking runs in a <strong>separate</strong> <code>Bloxstrap.exe</code> watcher process</td>
+    <td><code>Launcher.WaitForExit()</code> in <code>Account.JoinServer</code> returns shortly after the client starts. OK to keep.</td>
+  </tr>
+  <tr>
+    <td><code>%LocalAppData%\Bloxstrap\PlayerState.json</code> &rarr; <code>"VersionGuid": "version-cec3ad5889b447cf"</code>; client at <code>Bloxstrap\Versions\&lt;guid&gt;\RobloxPlayerBeta.exe</code></td>
+    <td>Use this to find Bloxstrap's current client.</td>
+  </tr>
+  <tr>
+    <td>Stock Roblox is <strong>also</strong> installed: <code>%LocalAppData%\Roblox\Versions\version-2366ba214ec740ca</code> (different version from Bloxstrap's)</td>
+    <td>Version resolution must look in both places.</td>
+  </tr>
+  <tr>
+    <td><code>Bloxstrap\Modifications\ClientSettings\ClientAppSettings.json</code> currently contains <strong>alt flags</strong> (<code>DFIntTextureQualityOverride=1</code>, <code>DFIntTaskSchedulerTargetFps=15</code>, ...) left by older RAM builds</td>
+    <td>The main is currently running with alt flags. Needs a one-time cleanup (Phase 6).</td>
+  </tr>
+  <tr>
+    <td>In-game settings live in shared <code>%LocalAppData%\Roblox\GlobalBasicSettings_13.xml</code></td>
+    <td>One file for all clients. Roblox reads it at startup and writes it back when it saves settings or exits.</td>
+  </tr>
+  <tr>
+    <td>Roblox only honors <strong>allowlisted</strong> FastFlags (devforum t/3966569). <code>DFIntTaskSchedulerTargetFps</code> is ignored</td>
+    <td>FPS has to be capped through <code>GlobalBasicSettings</code> <code>FramerateCap</code>, plus OS-level throttling (Phase 5).</td>
+  </tr>
+</table>
+</details>
+
+<details>
+<summary><strong>Architecture decision</strong></summary>
+<p><strong>Primary: dedicated alt client.</strong> RAM keeps its own client folder <code>AltClient\&lt;version-guid&gt;\</code> (next to <code>RAMSettings.ini</code>). It is <strong>hard-linked</strong> from the matching Roblox/Bloxstrap version folder, so it costs almost no disk space. Only its <code>ClientSettings\</code> folder is a real, separate directory, holding the low-graphics flags permanently. Alts are started by running <code>AltClient\&lt;guid&gt;\RobloxPlayerBeta.exe</code> directly. The main is always launched through Bloxstrap (protocol handler) with the user's own flags, and RAM never touches those flags.</p>
+<p>This avoids swapping one shared <code>ClientAppSettings.json</code> back and forth, which is what causes races today: an alt launch and a main launch close together, Bloxstrap copying at the wrong moment, or a crash leaving alt flags on the main.</p>
+<p><strong>Fallback: the existing shared-client swap.</strong> This is the merge-on-top + backup/restore code already in <code>ClientSettingsPatcher</code>. RAM uses it for an alt launch when the dedicated client can't be prepared, for example when no installed version folder matches the live Roblox version. Launching through Bloxstrap also makes Bloxstrap update Roblox, so the next alt launch can use the dedicated client again.</p>
+<p><strong>In-game settings (<code>GlobalBasicSettings</code>) stay shared.</strong> RAM coordinates them with a launch gate and a saved "main snapshot" (Phase 4).</p>
+</details>
+
+<hr>
+
+<details>
+<summary><strong>Phase 0: Ground rules</strong></summary>
+<ul>
+  <li>Target: .NET Framework 4.7.2, C# 8 (<code>LangVersion 8.0</code>). Old-style csproj: <strong>every new <code>.cs</code> file must be added as <code>&lt;Compile Include=...&gt;</code> in <code>RBX Alt Manager/RBX Alt Manager.csproj</code></strong>.</li>
+  <li>Match surrounding style: <code>Program.Logger.Info/Error</code>, <code>AccountManager.General.Get&lt;T&gt;/Set/Exists</code>, <code>AccountManager.IniSettings.Save("RAMSettings.ini")</code>, <code>[FastFlags]</code>-style log prefixes, terse comments.</li>
+  <li>Do <strong>not</strong> stage or modify the unrelated untracked files: <code>index.html</code> (unrelated page), <code>base.config</code>, <code>base_account.cs</code> (UTF-16 copies), <code>g-intention.txt</code>, <code>log.txt</code>.</li>
+  <li><code>g-intention.txt</code> (login browser switch / anti-detection) is <strong>out of scope</strong> for this plan.</li>
+  <li>Build: find MSBuild with <code>"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe</code>, then <code>MSBuild "RBX Alt Manager.sln" /p:Configuration=Release /p:Platform="Any CPU" /restore</code>. Output goes to <code>build\Release\</code>. If MSBuild isn't found, try <code>dotnet msbuild</code> with the same arguments, and report it if that fails too.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>Phase 1: Account roles (Main vs Alt), one source of truth</strong></summary>
+<p>New file <code>RBX Alt Manager/Classes/ClientProfiles.cs</code> (static class):</p>
+<ul>
+  <li><code>enum ClientRole { Main, Alt, Normal }</code></li>
+  <li><code>static string MainGroup =&gt; General.Exists("MainGroup") ? General.Get&lt;string&gt;("MainGroup") : "Main";</code><br>
+      Add the default <code>if (!General.Exists("MainGroup")) General.Set("MainGroup", "Main");</code> next to the other defaults in <code>AccountManager</code> (around line 122).</li>
+  <li><code>static string NormalizeGroup(string group)</code>: trim, strip a leading <code>^\d{1,3}\s?</code> prefix (same regex as <code>FindGroupProfile</code>).</li>
+  <li><code>static ClientRole GetRole(Account a)</code>:
+    <ul>
+      <li>Main if <code>NormalizeGroup(a.Group)</code> equals <code>NormalizeGroup(MainGroup)</code> (case-insensitive).</li>
+      <li>Alt if <code>GroupFastFlags</code> is enabled and <code>FindGroupProfile(a)</code> returns a file.</li>
+      <li>Normal otherwise.</li>
+    </ul>
+  </li>
+  <li><strong>The main never gets a profile, even if <code>Default.json</code> exists.</strong> Change <code>ClientSettingsPatcher.FindGroupProfile</code> to return <code>null</code> for the main.</li>
+  <li>Move <code>FindGroupProfile</code> into here or make it <code>internal</code>. Keep its matching order unchanged.</li>
+  <li><code>RobloxWatcher.cs:105</code>: replace the hard-coded <code>"Main"</code> check with <code>ClientProfiles.GetRole(account) != ClientRole.Alt</code>. Trim only accounts that are <strong>known alts</strong>: an unknown process (<code>account == null</code>) must not be trimmed.</li>
+</ul>
+<p><strong>Acceptance:</strong> an account in group <code>Main</code> (or <code>01 Main</code>) is always Main, even with <code>Default.json</code> present. An account in <code>Alts</code> with <code>FastFlags\Alts.json</code> present is Alt.</p>
+</details>
+
+<details>
+<summary><strong>Phase 2: Bloxstrap integration</strong></summary>
+<p>New file <code>RBX Alt Manager/Classes/Bloxstrap.cs</code> (static class <code>Bloxstrap</code>). It must work for Bloxstrap and for forks with a <code>Modifications</code> folder (Fishstrap, Voidstrap). Move the existing <code>ClientSettingsPatcher.GetBootstrapperDirectory()</code> here and keep a forwarding call so nothing breaks.</p>
+<ul>
+  <li><code>string Directory</code>: the existing registry detection.</li>
+  <li><code>bool IsInstalled =&gt; Directory != null</code>.</li>
+  <li><code>string ModificationsClientSettings =&gt; Path.Combine(Directory, "Modifications", "ClientSettings")</code>.</li>
+  <li><code>string GetVersionGuid()</code>: read <code>PlayerState.json</code> &rarr; <code>VersionGuid</code>. Fall back to <code>State.json</code> &rarr; <code>VersionGuid</code> (older builds) and then <code>State.json</code> &rarr; <code>Player.VersionGuid</code>. Parse defensively with <code>TryParseJson</code>; return null on any failure.</li>
+  <li><code>string GetClientDirectory()</code>: <code>Versions\&lt;guid&gt;</code> when it contains <code>RobloxPlayerBeta.exe</code>, else null.</li>
+</ul>
+<p>Add <code>ClientProfiles.FindClientSource(string wantedVersion)</code>. It returns the first folder named <code>wantedVersion</code> that contains <code>RobloxPlayerBeta.exe</code>, checking in this order:</p>
+<ol>
+  <li><code>Bloxstrap\Versions</code></li>
+  <li><code>%LocalAppData%\Roblox\Versions</code></li>
+  <li><code>%ProgramFiles(x86)%\Roblox\Versions</code></li>
+</ol>
+<p><code>wantedVersion</code> is <code>AccountManager.CurrentVersion</code>, which <code>AccountManager</code> already fetches from <code>clientsettings.roblox.com/v1/client-version/WindowsPlayer</code> &rarr; <code>clientVersionUpload</code>. If <code>CurrentVersion</code> is still null (fetch not finished or failed), fall back to <code>Bloxstrap.GetVersionGuid()</code>.</p>
+<p><strong>Acceptance:</strong> on this machine, <code>Bloxstrap.GetVersionGuid()</code> returns <code>version-cec3ad5889b447cf</code> and <code>FindClientSource</code> picks whichever installed folder matches the live version.</p>
+</details>
+
+<details>
+<summary><strong>Phase 3: Dedicated low-graphics alt client</strong></summary>
+<p>New file <code>RBX Alt Manager/Classes/AltClient.cs</code> (static class, all work done under a <code>lock</code>).</p>
+<p><code>static bool TryPrepare(Account account, out string exePath, out string reason)</code>:</p>
+<ol>
+  <li>Return false if setting <code>UseAltClient</code> is off, or the role isn't Alt.</li>
+  <li><code>source = ClientProfiles.FindClientSource(...)</code>. If null, return false with reason <code>"no installed client matches &lt;version&gt;"</code>. The caller falls back to the Bloxstrap launch, which updates Roblox.</li>
+  <li><code>target = Path.Combine(Environment.CurrentDirectory, "AltClient", Path.GetFileName(source))</code>.</li>
+  <li>If <code>target\.ram-source</code> is missing or its content isn't <code>source</code>, (re)build the folder:
+    <ul>
+      <li>Walk <code>source</code> recursively. <strong>Skip the <code>ClientSettings</code> directory entirely.</strong> For every other file, call <code>CreateHardLink(targetFile, sourceFile, IntPtr.Zero)</code> (P/Invoke <code>kernel32</code>, <code>CharSet.Unicode</code>, <code>SetLastError</code>). If hard-linking fails (different volume, error 17), fall back to <code>File.Copy</code> and log it once.</li>
+      <li><strong>Copy</strong> <code>AppSettings.xml</code> instead of linking it, so writes to either copy never reach the other.</li>
+      <li>Build into <code>target + ".tmp"</code> and rename it to <code>target</code> when done, so a half-built folder is never used. Write <code>.ram-source</code> last.</li>
+    </ul>
+  </li>
+  <li>Every time, write <code>target\ClientSettings\ClientAppSettings.json</code> from the account's group profile JSON:
+    <ul>
+      <li>Remove the <code>_RobloxSettings</code> key first.</li>
+      <li>Do <strong>not</strong> merge the user's Bloxstrap flags. The alt client gets only the alt profile.</li>
+      <li>Keep the existing <code>UnlockFPS</code> injection behavior consistent with <code>ApplyProfile</code>.</li>
+      <li>If two alts in different groups launch back to back, the lock plus the launch gate (Phase 4) keep them in order.</li>
+    </ul>
+  </li>
+  <li>Clean up stale clients: delete other <code>AltClient\version-*</code> folders when no running <code>RobloxPlayerBeta</code> process has its exe under them. Check with <code>process.MainModule.FileName</code> in try/catch, because the elevated second process throws. Deleting hard links never touches the source files.</li>
+  <li><code>exePath = target\RobloxPlayerBeta.exe</code>.</li>
+</ol>
+<p>Also refresh the alt client from <code>CreateLowGraphicsPreset</code> (or just let the next launch rewrite it, since step 5 runs on every launch).</p>
+
+<h3>Launch path changes (<code>Classes/Account.cs</code>, <code>JoinServer</code>)</h3>
+<ul>
+  <li>Refactor first: the three <code>roblox-player:1+...</code> strings (lines ~655&ndash;659) differ only in the <code>placelauncherurl</code>. Build that URL into a local and assemble the URI once in a local <code>launchUri</code>. Keep the behavior identical.</li>
+  <li>Replace the unconditional <code>ClientSettingsPatcher.PatchSettings(this)</code> near the top with a role-aware step:
+    <ul>
+      <li><strong>Main</strong>: no FastFlag patch at all. Call <code>RestoreOriginals()</code> (a no-op when there is no backup) so a left-over swap can't leak into the main. Apply the main in-game snapshot (Phase 4). Launch through the protocol (Bloxstrap) exactly as today.</li>
+      <li><strong>Alt</strong>: if <code>AltClient.TryPrepare(...)</code> succeeds, apply the alt <code>_RobloxSettings</code> (Phase 4), then <code>Process.Start(new ProcessStartInfo(exePath, launchUri) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exePath) })</code>. There is no launcher to wait for, so call <code>AccountManager.Instance.NextAccount()</code> after the client process is found (or after 10 s), then <code>AdjustWindowPosition</code>. If <code>TryPrepare</code> fails, log the reason and use the existing <code>PatchSettings(this)</code> + protocol launch (fallback).</li>
+      <li><strong>Normal</strong>: today's behavior (legacy <code>CustomClientSettings</code> / <code>UnlockFPS</code> through <code>PatchSettings</code>).</li>
+    </ul>
+  </li>
+  <li><strong>Mandatory verification before finalizing the argument format.</strong> Launch the main once through Bloxstrap, then run <code>Get-CimInstance Win32_Process -Filter "name='RobloxPlayerBeta.exe'" | select CommandLine</code>. Make the direct alt launch pass <strong>exactly the same shape</strong> of arguments that Bloxstrap passed. Bloxstrap 2.x is expected to pass the raw <code>roblox-player:1+...</code> URI as the single argument. If it passes <code>--app -t ... -j ... -b ... --launchtime=...</code> instead, mirror that. Write down the observed format in a comment.</li>
+  <li>Tracker ID parsing: add <code>Utilities.GetBrowserTrackerId(string commandLine)</code>. It matches <code>-b (\d+)</code> <strong>or</strong> <code>browsertrackerid[:=](\d+)</code> (case-insensitive). Use it in <code>Account.cs:532</code>, <code>Account.cs:712</code>, and <code>RobloxWatcher.cs:80</code>. Without this, URI-launched clients aren't matched to their account.</li>
+  <li>Leave the broken <code>UseOldJoin</code> branch alone. It never calls <code>Process.Start</code>. Mention it in the final report; fixing it is optional and not part of this plan.</li>
+</ul>
+<p><strong>Acceptance:</strong> launching 3 alts plus the main produces 3 <code>RobloxPlayerBeta.exe</code> processes whose exe is under <code>AltClient\</code> and 1 under <code>Bloxstrap\Versions\</code>. <code>Bloxstrap\Modifications\ClientSettings\ClientAppSettings.json</code> is byte-identical before and after.</p>
+</details>
+
+<details>
+<summary><strong>Phase 4: In-game settings coordination (<code>GlobalBasicSettings_13.xml</code>)</strong></summary>
+<p>The flags force low render quality on alts (<code>DFIntDebugFRMQualityLevelOverride</code>, texture override) no matter what the shared XML says. The XML still controls <strong>FramerateCap</strong> and <strong>MasterVolume</strong> for alts, and the <strong>main's</strong> graphics. An alt that exits writes its low values back into the XML, and the main would read them on its next launch.</p>
+<ul>
+  <li><strong>Launch gate</strong>: add <code>static SemaphoreSlim LaunchGate = new SemaphoreSlim(1, 1)</code> in <code>ClientProfiles</code>. <code>JoinServer</code> waits on it (<code>await WaitAsync</code>) before any settings write. It releases the gate when one of these happens first:
+    <ul>
+      <li>the new client process has been found and 8 s have passed since its <code>StartTime</code> (Roblox has read the XML by then)</li>
+      <li>a 30 s timeout</li>
+      <li>any exception</li>
+    </ul>
+    Use try/finally so a failed launch never leaves the gate held.
+  </li>
+  <li><strong>Main snapshot</strong>: file <code>FastFlags\Main.settings.json</code> holds a subset of XML properties: <code>SavedQualityLevel</code>, <code>GraphicsQualityLevel</code>, <code>FramerateCap</code>, <code>MasterVolume</code>, plus any other keys the user lists in the file.
+    <ul>
+      <li><code>CaptureMainSnapshot()</code>: read those properties from the XML and save them. Values come from <code>&lt;Properties&gt;&lt;token|int|float|bool name="X"&gt;</code>; reuse the existing <code>ApplyGlobalBasicSettings</code> lookup logic in reverse.</li>
+      <li>Capture <strong>manually</strong> with a button (Phase 6).</li>
+      <li>Capture <strong>automatically</strong> when RAM sees the main's <code>RobloxPlayerBeta</code> process exit: wait 2 s, then capture. Skip the capture if the captured values equal the alt profile's <code>_RobloxSettings</code> values, because that means an alt wrote last.</li>
+      <li>If no snapshot exists yet, create one from the XML the first time RAM is about to apply alt settings.</li>
+    </ul>
+  </li>
+  <li><strong>Per launch</strong>:
+    <ul>
+      <li>Main &rarr; write the snapshot into the XML (if one exists).</li>
+      <li>Alt &rarr; write the profile's <code>_RobloxSettings</code> into the XML. After the gate's settle point, write the main snapshot back.</li>
+      <li>This replaces the backup/restore of the XML for the main. Keep the existing <code>.backup.json</code> mechanism for <code>ClientAppSettings.json</code> in the fallback path only.</li>
+    </ul>
+  </li>
+  <li>Keep <code>RestoreOriginals()</code> on startup and on close (already wired in <code>AccountManager.cs</code>). Also have it write the main snapshot back to the XML.</li>
+</ul>
+<p><strong>Acceptance:</strong> launch alt, then main, then close the alt, then relaunch the main. The main still opens with its own graphics level, FPS cap and volume.</p>
+</details>
+
+<details>
+<summary><strong>Phase 5: Make alts cheaper (OS level, optional per setting)</strong></summary>
+<p>Do this in <code>RobloxWatcher.CheckProcesses</code>, only for processes matched to an <strong>Alt</strong> account, and only once per process (track handled PIDs in a <code>HashSet&lt;int&gt;</code>):</p>
+<ul>
+  <li><code>AltEfficiencyMode</code> (default on when <code>UseAltClient</code> is on):
+    <ul>
+      <li><code>process.PriorityClass = ProcessPriorityClass.BelowNormal</code>.</li>
+      <li>Enable EcoQoS with <code>SetProcessInformation(handle, ProcessPowerThrottling, ref PROCESS_POWER_THROTTLING_STATE { Version = 1, ControlMask = 1, StateMask = 1 }, size)</code> (P/Invoke, Windows 10 1709+). Wrap it in try/catch and log failures once.</li>
+    </ul>
+  </li>
+  <li><code>AltWindowWidth</code> / <code>AltWindowHeight</code> (default <code>0</code> = off, suggested <code>800x600</code>): in <code>AdjustWindowPosition</code>, when the account is Alt and has no remembered position, <code>MoveWindow</code> to that size. A smaller window renders far fewer pixels.</li>
+  <li>The existing <code>TrimAltsMemory</code> now uses the role helper from Phase 1.</li>
+  <li>Never touch the focused window's process priority. The watcher already skips focused windows; keep that.</li>
+</ul>
+</details>
+
+<details>
+<summary><strong>Phase 6: Settings UI and one-time migration</strong></summary>
+<p>Add a <strong>"Client Profiles..."</strong> button to Settings &rarr; Miscellaneous (<code>SettingsForm.Designer.cs</code>, same pattern as <code>CreatePresetButton</code>). It opens a new <code>Forms/ClientProfilesForm.cs</code>. Build the controls in code (no Designer file) to keep Designer churn low, and call the same <code>ApplyTheme</code> pattern <code>SettingsForm</code> uses. Controls:</p>
+<ul>
+  <li><strong>Main group</strong> (TextBox) &rarr; <code>General.MainGroup</code></li>
+  <li><strong>Use dedicated low-graphics alt client</strong> (CheckBox) &rarr; <code>General.UseAltClient</code>. Default: on when Bloxstrap or Roblox is detected.</li>
+  <li><strong>Alt efficiency mode</strong> (CheckBox) &rarr; <code>General.AltEfficiencyMode</code></li>
+  <li><strong>Alt window size</strong> (two NumericUpDown, 0 = off) &rarr; <code>General.AltWindowWidth/Height</code></li>
+  <li><strong>Capture main's in-game settings now</strong> (Button) &rarr; <code>CaptureMainSnapshot()</code>, then show the captured values.</li>
+  <li><strong>Clean Bloxstrap flags</strong> (Button):
+    <ul>
+      <li>Load <code>Bloxstrap.ModificationsClientSettings\ClientAppSettings.json</code>.</li>
+      <li>Remove every key that appears in the current alt profile JSON(s), <code>alt_temp.json</code>, or <code>LowGraphicsPreset</code>, plus <code>DFIntTaskSchedulerTargetFps</code>.</li>
+      <li>Save a backup to <code>FastFlags\bloxstrap-flags.bak.json</code> first.</li>
+      <li>Show a confirmation listing the removed keys. Refuse while any Roblox process is running.</li>
+    </ul>
+  </li>
+  <li>Read-only status labels:
+    <ul>
+      <li>Bloxstrap path and version (<code>FileVersionInfo</code> of <code>Bloxstrap.exe</code>), plus its <code>VersionGuid</code></li>
+      <li>Live Roblox version (<code>CurrentVersion</code>)</li>
+      <li>Alt client folder and version, or "not built"</li>
+      <li>Detected groups and their role: list <code>AccountManager.AccountsList</code> groups, each with Main / Alt (profile file name) / Normal</li>
+    </ul>
+  </li>
+</ul>
+<p>Save on change with <code>IniSettings.Save("RAMSettings.ini")</code>, like the other settings.</p>
+<p>Fix while in the Designer: <code>TrimAltsMemoryCB</code> and <code>OpenFastFlagsButton</code> both use <code>TabIndex = 14</code>. Renumber them.</p>
+</details>
+
+<details>
+<summary><strong>Phase 7: Docs</strong></summary>
+<ul>
+  <li>Update the README text generated in <code>ClientSettingsPatcher.EnsureFastFlagsDirectory()</code> <strong>and</strong> <code>FastFlags/README.txt</code> (they must match). Describe the main group, the dedicated alt client, the main snapshot, and that the main never uses <code>Default.json</code>.</li>
+  <li>Add a "Dedicated alt client" section to <code>FastFlags-Changelog.html</code> in the same style. Update its Setup Tutorial:
+    <ol>
+      <li>Clean Bloxstrap flags (button).</li>
+      <li>Put the main in group <code>Main</code>.</li>
+      <li>Put alts in group <code>Alts</code>.</li>
+      <li>Create Low Gfx Preset.</li>
+      <li>Capture main settings.</li>
+      <li>Make sure Multi Roblox is on.</li>
+    </ol>
+  </li>
+</ul>
+</details>
+
+<details>
+<summary><strong>Phase 8: Test matrix (manual, report results)</strong></summary>
+<table border="1" cellpadding="6" cellspacing="0">
+  <tr><th>#</th><th>Scenario</th><th>Expected</th></tr>
+  <tr><td>1</td><td>Build Release</td><td>0 errors, no new warnings in touched files</td></tr>
+  <tr><td>2</td><td>Fresh start, <code>UseAltClient</code> on, launch 1 alt</td><td><code>AltClient\&lt;guid&gt;\</code> created via hard links (folder size on disk &asymp; few MB, check with <code>fsutil hardlink list</code>); alt runs with low textures/grey sky; Bloxstrap flags file unchanged</td></tr>
+  <tr><td>3</td><td>Launch 3 alts in a row (default 8 s delay) and with AsyncJoin on</td><td>All 3 from <code>AltClient\</code>, each matched to its account (tracker ID), BelowNormal priority</td></tr>
+  <tr><td>4</td><td>Launch main while alts run</td><td>Main from <code>Bloxstrap\Versions\</code>, full graphics, own FPS cap/volume</td></tr>
+  <tr><td>5</td><td>Close alts, relaunch main</td><td>Main still on its own in-game settings (snapshot works)</td></tr>
+  <tr><td>6</td><td>Rename <code>AltClient\&lt;guid&gt;</code>'s source away / simulate version mismatch (set <code>CurrentVersion</code> to a fake value in debugger)</td><td>Falls back to Bloxstrap launch + shared swap; originals restored &le; 15 s after launch; log explains why</td></tr>
+  <tr><td>7</td><td>Kill RAM while an alt is launching (fallback path), restart RAM</td><td><code>.backup.json</code> restored on startup; main snapshot written back</td></tr>
+  <tr><td>8</td><td><code>Default.json</code> present, launch main</td><td>Main gets no profile</td></tr>
+  <tr><td>9</td><td>Bloxstrap not installed (rename registry handler value temporarily, or test on stock Roblox)</td><td>Alt client built from <code>Roblox\Versions</code>; main launches through stock Roblox</td></tr>
+</table>
+</details>
+
+<details>
+<summary><strong>Known unknowns (verify, don't assume)</strong></summary>
+<ol>
+  <li><strong>Direct-launch argument format.</strong> See the mandatory verification in Phase 3. If Roblox refuses the direct launch (error dialog, or it re-launches the installer), stop and report. Keep the fallback path as the default for alts until it's resolved.</li>
+  <li><strong>Whether Roblox writes <code>GlobalBasicSettings</code> on exit or only on setting change.</strong> Phase 4 is safe either way. Note the observed behavior in the final report.</li>
+  <li><strong>Allowlisted flags.</strong> Don't add flags to <code>LowGraphicsPreset</code> unless they're on the current Roblox allowlist. If unsure, leave the preset as is.</li>
+  <li><strong>Whether <code>FramerateCap</code> accepts values below 30.</strong> Test 15 and 20. If they're ignored, keep 30 and rely on EcoQoS.</li>
+</ol>
+</details>
+
+<details>
+<summary><strong>Deliverables</strong></summary>
+<ul>
+  <li>New files: <code>Classes/ClientProfiles.cs</code>, <code>Classes/Bloxstrap.cs</code>, <code>Classes/AltClient.cs</code>, <code>Forms/ClientProfilesForm.cs</code> (all registered in the csproj).</li>
+  <li>Modified files: <code>Classes/Account.cs</code>, <code>Classes/ClientSettingsPatcher.cs</code>, <code>Classes/RobloxWatcher.cs</code>, <code>Classes/Utilities.cs</code>, <code>AccountManager.cs</code>, <code>Forms/SettingsForm.cs</code>, <code>Forms/SettingsForm.Designer.cs</code>, <code>FastFlags/README.txt</code>, <code>FastFlags-Changelog.html</code>.</li>
+  <li>A short final report covering: test matrix results, the observed Bloxstrap command-line format, the answers to the known unknowns, and anything skipped.</li>
+  <li>Commit only if the user asks. Suggested split: (1) the existing uncommitted FastFlags work as is, (2) Phases 1&ndash;2, (3) Phase 3, (4) Phases 4&ndash;5, (5) Phases 6&ndash;7.</li>
+</ul>
+</details>
+
+</body>
+</html>

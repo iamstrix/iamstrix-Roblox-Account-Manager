@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Project Sundial: 3,000 MT Global Arsenal Detonation Simulation</title>
+    <style>
+        :root {
+            --amber: #ffaa00;
+            --red: #ff3333;
+            --cyan: #00f0ff;
+            --bg-panel: rgba(8, 12, 18, 0.82);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #030508;
+            font-family: 'Courier New', Courier, monospace;
+            color: #e6f1ff;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Whiteout Flash Overlay */
+        #flash-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+            transition: opacity 0.08s ease-out;
+        }
+
+        /* HUD Layer */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .panel {
+            background: var(--bg-panel);
+            border: 1px solid rgba(255, 170, 0, 0.35);
+            border-left: 4px solid var(--amber);
+            padding: 14px 18px;
+            border-radius: 4px;
+            backdrop-filter: blur(8px);
+            pointer-events: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        }
+
+        .telemetry-title {
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--amber);
+            margin-bottom: 6px;
+        }
+
+        #timer-display {
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: #ffffff;
+            text-shadow: 0 0 12px rgba(255, 170, 0, 0.7);
+            margin-bottom: 8px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: auto auto;
+            gap: 4px 16px;
+            font-size: 12px;
+        }
+
+        .stat-label {
+            color: #8b9bb4;
+        }
+
+        .stat-val {
+            color: var(--cyan);
+            font-weight: bold;
+            text-align: right;
+        }
+
+        /* Controls & POV Switcher */
+        .controls-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: rgba(20, 28, 40, 0.9);
+            color: #d0e0ff;
+            border: 1px solid rgba(0, 240, 255, 0.35);
+            padding: 8px 13px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.15s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            background: rgba(0, 240, 255, 0.2);
+            border-color: var(--cyan);
+            color: #fff;
+        }
+
+        button.active {
+            background: var(--cyan);
+            color: #050811;
+            border-color: var(--cyan);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
+        }
+
+        button.action-btn {
+            border-color: var(--red);
+            color: #ff9999;
+        }
+
+        button.action-btn:hover {
+            background: var(--red);
+            color: #fff;
+            box-shadow: 0 0 15px rgba(255, 51, 51, 0.7);
+        }
+
+        button.amber-btn {
+            border-color: var(--amber);
+            color: var(--amber);
+        }
+
+        button.amber-btn:hover {
+            background: var(--amber);
+            color: #050811;
+        }
+
+        /* Bottom Narration & Trivia */
+        .bottom-bar {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            width: 100%;
+            max-width: 920px;
+            margin: 0 auto;
+        }
+
+        #trivia-box {
+            width: 100%;
+            border-left-color: var(--cyan);
+            border-color: rgba(0, 240, 255, 0.35);
+            padding: 10px 16px;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .trivia-badge {
+            background: rgba(0, 240, 255, 0.15);
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+            padding: 3px 8px;
+            font-size: 10px;
+            letter-spacing: 1.5px;
+            white-space: nowrap;
+        }
+
+        #trivia-text {
+            flex: 1;
+            color: #d8e6ff;
+            line-height: 1.4;
+        }
+
+        #narration-box {
+            width: 100%;
+            text-align: center;
+            padding: 16px 24px;
+            background: rgba(5, 8, 14, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-top: 3px solid var(--red);
+        }
+
+        #narration-phase {
+            font-size: 11px;
+            letter-spacing: 3px;
+            color: var(--red);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        #narration-text {
+            font-size: 15px;
+            line-height: 1.5;
+            color: #ffffff;
+        }
+
+        /* Timeline Scrubber */
+        .timeline-bar {
+            width: 100%;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.12);
+            margin-top: 12px;
+            position: relative;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        #timeline-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--amber), var(--red), var(--cyan));
+            transition: width 0.1s linear;
+        }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+
+    <div id="canvas-container"></div>
+    <div id="flash-overlay"></div>
+
+    <div id="hud">
+        <div class="top-bar">
+            <!-- Telemetry Readout -->
+            <div class="panel">
+                <div class="telemetry-title">Global Stockpile Convergence // 12,500 Warheads</div>
+                <div id="timer-display">T - 00:10.00</div>
+                <div class="stat-grid">
+                    <span class="stat-label">COMBINED YIELD:</span>
+                    <span class="stat-val">3,000 MEGATONS (3 GT)</span>
+                    <span class="stat-label">FIREBALL DIAMETER:</span>
+                    <span class="stat-val" id="stat-fireball">0.00 km</span>
+                    <span class="stat-label">SHOCKWAVE RADIUS:</span>
+                    <span class="stat-val" id="stat-shockwave">0.00 km</span>
+                    <span class="stat-label">PLUME ALTITUDE:</span>
+                    <span class="stat-val" id="stat-altitude">0.00 km</span>
+                </div>
+            </div>
+
+            <!-- Camera POV & Replay Controls -->
+            <div class="controls-panel">
+                <div class="panel" style="padding: 10px 14px;">
+                    <div class="telemetry-title" style="text-align: right;">Camera POV Selection</div>
+                    <div class="btn-group">
+                        <button id="pov-0" class="active" onclick="setPOV(0)">1. Ground Zero (2 km)</button>
+                        <button id="pov-1" onclick="setPOV(1)">2. Observation Bunker (28 km)</button>
+                        <button id="pov-2" onclick="setPOV(2)">3. Low Earth Orbit (250 km)</button>
+                        <button id="pov-3" onclick="setPOV(3)">4. Free Orbit Cam</button>
+                    </div>
+                </div>
+
+                <div class="btn-group" style="pointer-events: auto;">
+                    <button class="amber-btn" id="audio-btn" onclick="toggleAudio()">Audio: ON</button>
+                    <button class="amber-btn" onclick="skipToDetonation()">Detonate Now (T-0)</button>
+                    <button class="action-btn" onclick="resetSimulation()">Replay Simulation</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Narration & Trivia -->
+        <div class="bottom-bar">
+            <div class="panel" id="trivia-box">
+                <span class="trivia-badge">SCALE TRIVIA</span>
+                <span id="trivia-text">Initializing comparative planetary scale database...</span>
+                <button onclick="nextTrivia()" style="padding: 4px 10px; font-size: 11px;">Next Fact</button>
+            </div>
+
+            <div class="panel" id="narration-box">
+                <div id="narration-phase">PHASE 0 // PRE-IGNITION CONVERGENCE</div>
+                <div id="narration-text">
+                    All 12,500 nuclear warheads on Earth have been stacked into a single 80-meter spire. Total potential
+                    yield: 3,000 Megatons of TNT.
+                </div>
+                <div class="timeline-bar">
+                    <div id="timeline-fill"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // ==========================================
+        // 1. NARRATION & TRIVIA DATA
+        // ==========================================
+        const NARRATION_SCRIPT = [
+            {
+                tMin: -10, tMax: -6,
+                phase: "PHASE 0 // GLOBAL ARSENAL CONVERGENCE",
+                text: "All ~12,500 nuclear warheads from every nuclear-armed nation are stacked into a single central tower. Combined yield: 3,000 Megatons (3 Gigatons) of TNT."
+            },
+            {
+                tMin: -6, tMax: -2.5,
+                phase: "PHASE 0 // CRITICAL ASSEMBLY",
+                text: "That is 200,000 times the power of the Hiroshima bomb, or 60 Tsar Bombas detonated at the exact same microsecond."
+            },
+            {
+                tMin: -2.5, tMax: 0,
+                phase: "PHASE 0 // FIRING SEQUENCE LOCKED",
+                text: "High-explosive lenses armed across all 12,500 warheads. Simultaneous X-ray implosion cascade begins in 2 seconds..."
+            },
+            {
+                tMin: 0, tMax: 2.5,
+                phase: "T+0.0s // DOUBLE FLASH & PLASMA IGNITION",
+                text: "DETONATION. Core temperatures hit 100 million °C—five times hotter than the center of the Sun. Everything within 5 km is instantly vaporized into plasma."
+            },
+            {
+                tMin: 2.5, tMax: 7.5,
+                phase: "T+3.0s // THE 12-KILOMETER SUN",
+                text: "A blinding fireball expands to 12.6 km across, gouging a crater 2.5 km wide into solid bedrock. Thermal radiation ignites forests and structures 250 km away."
+            },
+            {
+                tMin: 7.5, tMax: 15,
+                phase: "T+8.0s // SUPERSONIC MACH STEM SHOCKWAVE",
+                text: "The atmospheric shockwave races outward at Mach 4+. Every building within 100 km is flattened; the pressure wave will circle the Earth four times."
+            },
+            {
+                tMin: 15, tMax: 26,
+                phase: "T+15.0s // MESOSPHERIC MUSHROOM CLOUD",
+                text: "The fireball rises at 300 km/h, punching completely through the troposphere and stratosphere into the mesosphere over 55 km above Earth."
+            },
+            {
+                tMin: 26, tMax: 999,
+                phase: "T+26.0s // GLOBAL NUCLEAR WINTER ONSET",
+                text: "Hundreds of millions of tons of pulverized rock and soot spread across the upper atmosphere, blocking sunlight and plunging global temperatures for a decade."
+            }
+        ];
+
+        const TRIVIA_FACTS = [
+            "METEOR COMPARISON: The Chicxulub asteroid that wiped out the dinosaurs released ~100 MILLION Megatons—33,000 times stronger than all the world's nukes combined.",
+            "CRATER SCALE: Even 3,000 Megatons won't crack Earth's crust. It carves a crater ~2.5 km wide, whereas the Chicxulub asteroid punched a 180 km crater 20 km deep.",
+            "VOLCANIC COMPARISON: This 3,000 MT blast is 15 times stronger than the 1883 eruption of Krakatoa (200 MT), which was heard 4,800 km away.",
+            "SOLAR FLARE SCALE: In a single second, the Sun emits roughly 90 billion Megatons of energy—meaning all of humanity's nukes equal 0.000003% of one second of sunlight.",
+            "EARTHQUAKE EQUIVALENT: Detonating 3,000 MT on the surface registers as roughly a Magnitude 8.3 to 8.5 seismic event globally.",
+            "URANIUM VOLUME: All the fissile plutonium and uranium inside these 12,500 warheads could fit inside a single olympic-sized swimming pool."
+        ];
+
+        let triviaIndex = 0;
+
+        // ==========================================
+        // 2. SYNTHESIZED WEB AUDIO ENGINE
+        // ==========================================
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+                this.lastBeepSecond = null;
+                this.exploded = false;
+            }
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            }
+            playBeep(freq = 880, duration = 0.12) {
+                if (!this.enabled) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            }
+            playDetonationRumbler() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                // White noise buffer for roar
+                const bufferSize = this.ctx.sampleRate * 6;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(160, now);
+                filter.frequency.exponentialRampToValueAtTime(35, now + 5.5);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.01, now);
+                gain.gain.linearRampToValueAtTime(0.65, now + 0.15);
+                gain.gain.exponentialRampToValueAtTime(0.005, now + 5.9);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start(now);
+                noise.stop(now + 6);
+            }
+        }
+        const sound = new SoundEngine();
+
+        // ==========================================
+        // 3. THREE.JS SCENE & PROCEDURAL ASSETS
+        // ==========================================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x05070c);
+        scene.fog = new THREE.FogExp2(0x05070c, 0.0018);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 3000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.enabled = false;
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0x283655, 1.2);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0x88aaff, 0.8);
+        dirLight.position.set(80, 140, 60);
+        scene.add(dirLight);
+
+        const blastLight = new THREE.PointLight(0xffaa33, 0, 900, 1.2);
+        blastLight.position.set(0, 12, 0);
+        scene.add(blastLight);
+
+        // Terrain & City Grid for Scale (1 unit = ~100 meters)
+        const groundGeo = new THREE.PlaneGeometry(1600, 1600, 128, 128);
+        groundGeo.rotateX(-Math.PI / 2);
+        const groundMat = new THREE.MeshStandardMaterial({
+            color: 0x101520,
+            roughness: 0.85,
+            metalness: 0.15
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        scene.add(ground);
+
+        const gridHelper = new THREE.GridHelper(1200, 120, 0x1e3250, 0x111c2d);
+        gridHelper.position.y = 0.05;
+        scene.add(gridHelper);
+
+        // Distance rings on the ground (5 km, 15 km, 30 km, 50 km)
+        const ringRadii = [15, 35, 70, 120];
+        ringRadii.forEach((r) => {
+            const rGeo = new THREE.RingGeometry(r - 0.25, r + 0.25, 96);
+            rGeo.rotateX(-Math.PI / 2);
+            const rMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.22 });
+            const ringMesh = new THREE.Mesh(rGeo, rMat);
+            ringMesh.position.y = 0.1;
+            scene.add(ringMesh);
+        });
+
+        // Instanced Surrounding City Skyline / Test Structures for Scale & Shockwave Flattening
+        const buildingCount = 1200;
+        const bGeo = new THREE.BoxGeometry(1, 1, 1);
+        bGeo.translate(0, 0.5, 0);
+        const bMat = new THREE.MeshStandardMaterial({ color: 0x26354a, roughness: 0.6 });
+        const buildingsMesh = new THREE.InstancedMesh(bGeo, bMat, buildingCount);
+        scene.add(buildingsMesh);
+
+        const buildingData = [];
+        const dummy = new THREE.Object3D();
+        for (let i = 0; i < buildingCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 4 + Math.pow(Math.random(), 0.7) * 140;
+            const x = Math.cos(angle) * dist;
+            const z = Math.sin(angle) * dist;
+            const w = 0.4 + Math.random() * 1.1;
+            const h = 0.8 + Math.random() * 4.5 * (dist < 35 ? 1.4 : 0.7);
+            const d = 0.4 + Math.random() * 1.1;
+            buildingData.push({ x, z, dist, w, h, d, collapsed: 0 });
+            dummy.position.set(x, 0, z);
+            dummy.scale.set(w, h, d);
+            dummy.rotation.set(0, 0, 0);
+            dummy.updateMatrix();
+            buildingsMesh.setMatrixAt(i, dummy.matrix);
+        }
+
+        // The Warhead Pile (12,500 warheads stacked into a glowing spire at Ground Zero)
+        const warheadPileGroup = new THREE.Group();
+        const spireGeo = new THREE.ConeGeometry(1.6, 5.5, 24);
+        spireGeo.translate(0, 2.75, 0);
+        const spireMat = new THREE.MeshStandardMaterial({
+            color: 0x3a4454,
+            emissive: 0xff3300,
+            emissiveIntensity: 0.3,
+            roughness: 0.3,
+            metalness: 0.8
+        });
+        const spireMesh = new THREE.Mesh(spireGeo, spireMat);
+        warheadPileGroup.add(spireMesh);
+
+        // Pulsing Cherenkov/Beacon ring around the warhead pile
+        const beaconGeo = new THREE.CylinderGeometry(0.15, 0.15, 8, 12);
+        const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff3333 });
+        const beaconMesh = new THREE.Mesh(beaconGeo, beaconMat);
+        beaconMesh.position.y = 4;
+        warheadPileGroup.add(beaconMesh);
+        scene.add(warheadPileGroup);
+
+        // ==========================================
+        // 4. EXPLOSION FX MESHES (FIREBALL, SHOCKWAVE, MUSHROOM PLUME)
+        // ==========================================
+        const explosionGroup = new THREE.Group();
+        scene.add(explosionGroup);
+
+        // Procedural Magma/Plasma Shader for the Fireball
+        const fireballVertexShader = `
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      uniform float uTime;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vPosition = position;
+        // Subtle boiling displacement
+        float displacement = sin(position.x * 3.0 + uTime * 6.0) * cos(position.y * 3.0 + uTime * 5.0) * 0.06;
+        vec3 newPos = position + normal * displacement;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
+      }
+    `;
+
+        const fireballFragmentShader = `
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      uniform float uTime;
+      uniform float uCoolDown;
+      void main() {
+        float noise = sin(vPosition.x * 4.5 + uTime * 4.0) * cos(vPosition.y * 4.5 - uTime * 3.5) * sin(vPosition.z * 4.5 + uTime * 2.5);
+        vec3 hotCore = vec3(1.0, 0.98, 0.85);
+        vec3 midOrange = vec3(1.0, 0.45, 0.05);
+        vec3 darkSmoke = vec3(0.12, 0.07, 0.06);
+
+        float t = clamp(0.5 + 0.5 * noise - uCoolDown * 0.65, 0.0, 1.0);
+        vec3 col = mix(darkSmoke, midOrange, smoothstep(0.0, 0.55, t));
+        col = mix(col, hotCore, smoothstep(0.55, 1.0, t));
+
+        // Fresnel rim glow
+        float rim = 1.0 - max(dot(vNormal, vec3(0.0, 0.0, 1.0)), 0.0);
+        col += vec3(1.0, 0.35, 0.0) * pow(rim, 2.2) * (1.0 - uCoolDown * 0.5);
+
+        gl_FragColor = vec4(col, 1.0 - uCoolDown * 0.25);
+      }
+    `;
+
+        const fireballUniforms = {
+            uTime: { value: 0 },
+            uCoolDown: { value: 0 }
+        };
+
+        const fireballGeo = new THREE.SphereGeometry(1, 64, 64);
+        const fireballMat = new THREE.ShaderMaterial({
+            vertexShader: fireballVertexShader,
+            fragmentShader: fireballFragmentShader,
+            uniforms: fireballUniforms,
+            transparent: true
+        });
+        const fireballMesh = new THREE.Mesh(fireballGeo, fireballMat);
+        fireballMesh.visible = false;
+        explosionGroup.add(fireballMesh);
+
+        // Mushroom Stem
+        const stemGeo = new THREE.CylinderGeometry(0.45, 1.1, 1, 32, 16, true);
+        stemGeo.translate(0, 0.5, 0);
+        const stemMat = new THREE.MeshStandardMaterial({
+            color: 0x2a1d17,
+            emissive: 0xff4400,
+            emissiveIntensity: 0.45,
+            roughness: 0.9,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.9
+        });
+        const stemMesh = new THREE.Mesh(stemGeo, stemMat);
+        stemMesh.visible = false;
+        explosionGroup.add(stemMesh);
+
+        // Supersonic Ground Shockwave Ring
+        const shockGeo = new THREE.RingGeometry(0.85, 1.0, 96);
+        shockGeo.rotateX(-Math.PI / 2);
+        const shockMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.9
+        });
+        const shockMesh = new THREE.Mesh(shockGeo, shockMat);
+        shockMesh.position.y = 0.3;
+        shockMesh.visible = false;
+        explosionGroup.add(shockMesh);
+
+        // Wilson Condensation Cloud Torus
+        const wilsonGeo = new THREE.TorusGeometry(1, 0.18, 24, 96);
+        wilsonGeo.rotateX(Math.PI / 2);
+        const wilsonMat = new THREE.MeshStandardMaterial({
+            color: 0xebf4ff,
+            roughness: 0.9,
+            transparent: true,
+            opacity: 0
+        });
+        const wilsonMesh = new THREE.Mesh(wilsonGeo, wilsonMat);
+        wilsonMesh.visible = false;
+        explosionGroup.add(wilsonMesh);
+
+        // Stratospheric Mesosphere Anvil Cap
+        const anvilGeo = new THREE.SphereGeometry(1, 48, 32);
+        anvilGeo.scale(1.8, 0.32, 1.8);
+        const anvilMat = new THREE.MeshStandardMaterial({
+            color: 0x332622,
+            emissive: 0xcc3300,
+            emissiveIntensity: 0.35,
+            roughness: 0.95,
+            transparent: true,
+            opacity: 0
+        });
+        const anvilMesh = new THREE.Mesh(anvilGeo, anvilMat);
+        anvilMesh.visible = false;
+        explosionGroup.add(anvilMesh);
+
+        // Debris & Ash Particle System
+        const particleCount = 2500;
+        const pGeo = new THREE.BufferGeometry();
+        const pPositions = new Float32Array(particleCount * 3);
+        const pVelocities = [];
+        for (let i = 0; i < particleCount; i++) {
+            pPositions[i * 3] = 0;
+            pPositions[i * 3 + 1] = 0;
+            pPositions[i * 3 + 2] = 0;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.random() * Math.PI * 0.48;
+            const speed = 4 + Math.random() * 28;
+            pVelocities.push({
+                vx: Math.sin(phi) * Math.cos(theta) * speed,
+                vy: Math.cos(phi) * speed * 1.35,
+                vz: Math.sin(phi) * Math.sin(theta) * speed
+            });
+        }
+        pGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+        const pMat = new THREE.PointsMaterial({
+            color: 0xff8833,
+            size: 1.4,
+            transparent: true,
+            opacity: 0.85,
+            blending: THREE.AdditiveBlending
+        });
+        const particleSystem = new THREE.Points(pGeo, pMat);
+        particleSystem.visible = false;
+        explosionGroup.add(particleSystem);
+
+        // ==========================================
+        // 5. SIMULATION STATE, CAMERAS & CONTROLS
+        // ==========================================
+        let simTime = -10.0; // Starts at T - 10.0 seconds
+        const MAX_SIM_TIME = 38.0;
+        let currentPOV = 0;
+        let cameraShakeIntensity = 0;
+        const clock = new THREE.Clock();
+
+        function updateTriviaUI() {
+            document.getElementById('trivia-text').textContent = TRIVIA_FACTS[triviaIndex];
+        }
+        updateTriviaUI();
+
+        window.nextTrivia = function () {
+            triviaIndex = (triviaIndex + 1) % TRIVIA_FACTS.length;
+            updateTriviaUI();
+        };
+
+        window.setPOV = function (povIndex) {
+            currentPOV = povIndex;
+            for (let i = 0; i < 4; i++) {
+                document.getElementById(`pov-${i}`).classList.toggle('active', i === povIndex);
+            }
+            if (povIndex === 3) {
+                controls.enabled = true;
+                camera.position.set(0, 45, 110);
+                controls.target.set(0, 18, 0);
+            } else {
+                controls.enabled = false;
+            }
+        };
+
+        window.toggleAudio = function () {
+            sound.enabled = !sound.enabled;
+            document.getElementById('audio-btn').textContent = `Audio: ${sound.enabled ? 'ON' : 'OFF'}`;
+        };
+
+        window.skipToDetonation = function () {
+            if (simTime < -0.2) {
+                simTime = -0.15;
+            }
+        };
+
+        window.resetSimulation = function () {
+            simTime = -10.0;
+            sound.exploded = false;
+            sound.lastBeepSecond = null;
+            cameraShakeIntensity = 0;
+
+            // Reset city buildings
+            for (let i = 0; i < buildingCount; i++) {
+                const b = buildingData[i];
+                b.collapsed = 0;
+                dummy.position.set(b.x, 0, b.z);
+                dummy.scale.set(b.w, b.h, b.d);
+                dummy.rotation.set(0, 0, 0);
+                dummy.updateMatrix();
+                buildingsMesh.setMatrixAt(i, dummy.matrix);
+            }
+            buildingsMesh.instanceMatrix.needsUpdate = true;
+
+            // Reset meshes
+            warheadPileGroup.visible = true;
+            fireballMesh.visible = false;
+            stemMesh.visible = false;
+            shockMesh.visible = false;
+            wilsonMesh.visible = false;
+            anvilMesh.visible = false;
+            particleSystem.visible = false;
+            blastLight.intensity = 0;
+            document.getElementById('flash-overlay').style.opacity = 0;
+        };
+
+        // ==========================================
+        // 6. MAIN ANIMATION & PHYSICS LOOP
+        // ==========================================
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.1);
+
+            if (simTime < MAX_SIM_TIME) {
+                simTime += dt;
+            }
+
+            // 1. Update Timer & Audio Cues
+            const timerEl = document.getElementById('timer-display');
+            if (simTime < 0) {
+                const absT = Math.abs(simTime);
+                const secs = Math.floor(absT);
+                const ms = Math.floor((absT - secs) * 100);
+                timerEl.textContent = `T - 00:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+                timerEl.style.color = secs <= 3 ? '#ff3333' : '#ffffff';
+
+                if (secs !== sound.lastBeepSecond && secs <= 9) {
+                    sound.lastBeepSecond = secs;
+                    sound.playBeep(secs === 0 ? 1320 : 740, secs === 0 ? 0.25 : 0.1);
+                }
+
+                // Pulse warhead spire before detonation
+                const pulse = 0.5 + 0.5 * Math.sin(simTime * 12);
+                spireMat.emissiveIntensity = 0.3 + pulse * 1.4;
+                beaconMesh.scale.setScalar(1 + pulse * 0.5);
+            } else {
+                const secs = Math.floor(simTime);
+                const ms = Math.floor((simTime - secs) * 100);
+                timerEl.textContent = `T + 00:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+                timerEl.style.color = '#ffaa00';
+
+                if (!sound.exploded) {
+                    sound.exploded = true;
+                    sound.playDetonationRumbler();
+                    // Thermal double-flash
+                    const flash = document.getElementById('flash-overlay');
+                    flash.style.opacity = 1;
+                    setTimeout(() => { flash.style.opacity = 0.15; }, 140);
+                    setTimeout(() => { flash.style.opacity = 0.85; }, 260);
+                    setTimeout(() => { flash.style.opacity = 0; }, 700);
+                }
+            }
+
+            // 2. Update Narration & Scrubber
+            const progressPct = Math.min(100, Math.max(0, ((simTime + 10) / (MAX_SIM_TIME + 10)) * 100));
+            document.getElementById('timeline-fill').style.width = `${progressPct}%`;
+
+            for (const item of NARRATION_SCRIPT) {
+                if (simTime >= item.tMin && simTime < item.tMax) {
+                    document.getElementById('narration-phase').textContent = item.phase;
+                    document.getElementById('narration-text').textContent = item.text;
+                    break;
+                }
+            }
+
+            // 3. Post-Detonation Physics & Visual Scaling
+            if (simTime >= 0) {
+                const t = simTime;
+                warheadPileGroup.visible = false;
+                fireballMesh.visible = true;
+                stemMesh.visible = true;
+                shockMesh.visible = true;
+                wilsonMesh.visible = true;
+                anvilMesh.visible = true;
+                particleSystem.visible = true;
+
+                // Fireball expansion & buoyant rise into the stratosphere
+                const fireballRadius = 2.0 + 18.0 * (1 - Math.exp(-t * 0.45)) + t * 0.35;
+                const fireballAltitude = Math.pow(Math.max(0, t - 1.2), 1.45) * 1.9;
+                fireballMesh.scale.setScalar(fireballRadius);
+                fireballMesh.position.y = fireballAltitude;
+
+                fireballUniforms.uTime.value = t;
+                fireballUniforms.uCoolDown.value = Math.min(1.0, t / 28.0);
+
+                // Mushroom Column Stem
+                stemMesh.scale.set(fireballRadius * 0.65, Math.max(0.1, fireballAltitude), fireballRadius * 0.65);
+                stemMat.emissiveIntensity = Math.max(0.05, 0.6 - t * 0.02);
+
+                // Stratospheric Mesosphere Anvil Cap
+                if (t > 8) {
+                    const capFactor = Math.min(1, (t - 8) / 14);
+                    anvilMesh.Material = anvilMat;
+                    anvilMat.opacity = capFactor * 0.92;
+                    const capScale = fireballRadius * (1.1 + capFactor * 1.8);
+                    anvilMesh.scale.set(capScale * 1.8, capScale * 0.28, capScale * 1.8);
+                    anvilMesh.position.y = fireballAltitude + fireballRadius * 0.45;
+                } else {
+                    anvilMat.opacity = 0;
+                }
+
+                // Supersonic Shockwave propagation
+                const shockRadius = t * 6.8;
+                shockMesh.scale.setScalar(shockRadius);
+                shockMat.opacity = Math.max(0, 0.95 - t / 26);
+
+                // Wilson Condensation Cloud Ring
+                if (t > 1.2 && t < 14) {
+                    wilsonMat.opacity = Math.sin(((t - 1.2) / 12.8) * Math.PI) * 0.65;
+                    wilsonMesh.scale.setScalar(fireballRadius * 1.35);
+                    wilsonMesh.position.y = fireballAltitude * 0.6 + 6;
+                } else {
+                    wilsonMat.opacity = 0;
+                }
+
+                // Dynamic Blast Lighting
+                blastLight.position.y = fireballAltitude + 10;
+                blastLight.intensity = Math.max(0, 120 * Math.exp(-t * 0.12));
+
+                // Update Ejecta Particles
+                const posArr = particleSystem.geometry.attributes.position.array;
+                for (let i = 0; i < particleCount; i++) {
+                    const v = pVelocities[i];
+                    posArr[i * 3] = v.vx * t * 0.45;
+                    posArr[i * 3 + 1] = Math.max(0.2, v.vy * t * 0.45 - 0.5 * 1.8 * t * t * 0.08);
+                    posArr[i * 3 + 2] = v.vz * t * 0.45;
+                }
+                particleSystem.geometry.attributes.position.needsUpdate = true;
+
+                // Flatten City Buildings as the Shockwave Ring Passes Over Them
+                let matrixDirty = false;
+                for (let i = 0; i < buildingCount; i++) {
+                    const b = buildingData[i];
+                    if (!b.collapsed && shockRadius >= b.dist) {
+                        b.collapsed = 1;
+                        matrixDirty = true;
+                        const pushAngle = Math.atan2(b.z, b.x);
+                        dummy.position.set(b.x + Math.cos(pushAngle) * 0.6, 0, b.z + Math.sin(pushAngle) * 0.6);
+                        dummy.scale.set(b.w * 1.2, b.h * 0.18, b.d * 1.2);
+                        dummy.rotation.set((Math.random() - 0.5) * 0.8, 0, (Math.random() - 0.5) * 0.8);
+                        dummy.updateMatrix();
+                        buildingsMesh.setMatrixAt(i, dummy.matrix);
+                    }
+                }
+                if (matrixDirty) buildingsMesh.instanceMatrix.needsUpdate = true;
+
+                // Update Telemetry HUD Metrics
+                const realFireballKm = Math.min(12.8, (fireballRadius / 24) * 12.8).toFixed(2);
+                const realShockKm = (shockRadius * 0.85).toFixed(2);
+                const realAltKm = Math.min(58.5, (fireballAltitude + fireballRadius) * 0.48).toFixed(2);
+                document.getElementById('stat-fireball').textContent = `${realFireballKm} km`;
+                document.getElementById('stat-shockwave').textContent = `${realShockKm} km`;
+                document.getElementById('stat-altitude').textContent = `${realAltKm} km`;
+
+                // Camera Shake when shockwave hits observation point
+                if (t < 12) {
+                    cameraShakeIntensity = Math.max(0, (12 - t) * 0.12);
+                } else {
+                    cameraShakeIntensity = 0;
+                }
+            } else {
+                document.getElementById('stat-fireball').textContent = `0.00 km`;
+                document.getElementById('stat-shockwave').textContent = `0.00 km`;
+                document.getElementById('stat-altitude').textContent = `0.00 km`;
+            }
+
+            // 4. Camera POV Positioning
+            const shakeX = (Math.random() - 0.5) * cameraShakeIntensity;
+            const shakeY = (Math.random() - 0.5) * cameraShakeIntensity;
+
+            if (currentPOV === 0) {
+                // POV 1: Ground Zero Perimeter (2 km away, pulls back slightly on blast)
+                const pullBack = simTime > 0 ? simTime * 1.8 : 0;
+                const angle = Date.now() * 0.00025;
+                const radius = 14 + pullBack;
+                camera.position.set(
+                    Math.cos(angle) * radius + shakeX,
+                    3.5 + (simTime > 0 ? simTime * 0.7 : 0) + shakeY,
+                    Math.sin(angle) * radius
+                );
+                camera.lookAt(0, simTime > 0 ? Math.min(35, simTime * 1.4) : 2.5, 0);
+            } else if (currentPOV === 1) {
+                // POV 2: Observation Bunker (28 km away, ground level looking up at the horizon)
+                camera.position.set(0 + shakeX * 1.5, 2.2 + Math.max(0, shakeY), 68);
+                const lookY = simTime > 0 ? Math.min(48, simTime * 1.65) : 3;
+                camera.lookAt(0, lookY, 0);
+            } else if (currentPOV === 2) {
+                // POV 3: Low Earth Orbit Satellite View (250 km altitude looking down at curvature/plume)
+                const orbitAngle = Date.now() * 0.00015;
+                camera.position.set(Math.cos(orbitAngle) * 165, 135, Math.sin(orbitAngle) * 165);
+                camera.lookAt(0, 15, 0);
+            } else if (currentPOV === 3) {
+                controls.update();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+
+</html>

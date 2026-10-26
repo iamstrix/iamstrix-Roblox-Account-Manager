@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Testing client profiles | Roblox Account Manager</title>
+<style>
+  :root { --ink: #233044; --muted: #657185; --border: #dfe4eb; --accent: #275fc1; }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+  body { margin: 0; background: #f5f6f8; color: var(--ink); font: 16px/1.75 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .page { max-width: 960px; margin: 48px auto; padding: 0 24px; }
+  .eyebrow { margin: 0 0 12px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+  nav { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 20px 0 24px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { color: #173e83; }
+  a:focus-visible { outline: 3px solid #8bb5ff; outline-offset: 4px; border-radius: 2px; }
+  nav a { font-size: 13px; text-decoration: none; }
+  nav a:hover { text-decoration: underline; }
+  article { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 36px 44px; box-shadow: 0 3px 14px #23304404; }
+  h1, h2 { line-height: 1.25; color: #17243a; }
+  h1 { font-size: clamp(28px, 4.5vw, 40px); letter-spacing: -.035em; margin: 0 0 20px; }
+  h2 { font-size: 23px; letter-spacing: -.015em; margin: 40px 0 20px; padding-top: 28px; border-top: 1px solid var(--border); }
+  p { margin: 0 0 16px; }
+  ol, ul { padding-left: 24px; margin: 0 0 20px; }
+  li { padding-left: 6px; margin-bottom: 14px; }
+  li::marker { color: var(--muted); font-weight: 600; }
+  li p:last-child { margin-bottom: 0; }
+  strong { font-weight: 650; }
+  code { background: #edf1f6; border-radius: 4px; padding: 2px 5px; color: #334460; font: .86em/1.6 Consolas, "Cascadia Code", monospace; overflow-wrap: anywhere; }
+  .code-block { border: 1px solid #dbe2ec; border-radius: 7px; overflow: hidden; margin: 16px 0 20px; background: #f7f9fc; }
+  .code-label { padding: 6px 14px; background: #edf1f6; color: var(--muted); border-bottom: 1px solid #dbe2ec; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; }
+  pre { overflow-x: auto; padding: 14px 16px; margin: 0; line-height: 1.65; }
+  pre code { background: transparent; padding: 0; border-radius: 0; overflow-wrap: normal; font-size: 13px; }
+  footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 20px; color: var(--muted); font-size: 12px; }
+  @media (max-width: 600px) { .page { margin: 24px auto; padding: 0 16px; } article { padding: 24px 20px; } body { font-size: 15px; } h2 { font-size: 21px; } nav { gap: 8px 16px; } footer { flex-direction: column; gap: 4px; } }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  @media print { body { background: white; color: black; font-size: 11pt; } .page { max-width: none; margin: 0; padding: 0; } nav, footer { display: none; } article { padding: 0; border: 0; box-shadow: none; } h2 { break-after: avoid; } pre { white-space: pre-wrap; overflow-wrap: anywhere; } .code-block { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main class="page">
+<p class="eyebrow">Roblox Account Manager / Test guide</p>
+<nav aria-label="Guide sections"><a href="#first-setup">First setup</a>
+<a href="#main-smoke-test">Main smoke test</a>
+<a href="#fallback-and-recovery">Fallback and recovery</a>
+<a href="#repeatable-fixture-checks">Repeatable fixture checks</a>
+<a href="#implementation-verification-report">Implementation verification report</a></nav>
+<article aria-labelledby="testing-client-profiles">
+<h1 id="testing-client-profiles">Testing client profiles</h1>
+<p>The Release build is in <code>build/Release</code>. Close the previous RAM instance before starting <code>RBX Alt Manager.exe</code> there. Use your usual account database and settings with this build, or add one test main and one test alt. RAM stores its settings, FastFlags and AltClient folders in its working directory.</p>
+<h2 id="first-setup">First setup</h2>
+<ol>
+<li><p>Close Roblox. Open <strong>Settings → Miscellaneous → Client Profiles</strong>.</p>
+</li>
+<li><p>If an older build left alt flags in Bloxstrap, click <strong>Clean Bloxstrap flags</strong>. Review the keys before confirming. Keep <code>FastFlags/bloxstrap-flags.bak.json</code>.</p>
+</li>
+<li><p>Put the main account in <strong>Main</strong>, and alts in <strong>Alts</strong>. Number prefixes such as <code>01 Main</code> and <code>02 Alts</code> work. You can change the Main group in Client Profiles.</p>
+</li>
+<li><p>In Miscellaneous, click <strong>Create Low Gfx Preset</strong>. Leave <strong>Group-Based FastFlags</strong> on. In Client Profiles, enable the dedicated alt client and efficiency mode. Optional window size: width <strong>800</strong>, height <strong>600</strong>.</p>
+</li>
+<li><p>Enable <strong>Multi Roblox</strong>. Use the regular join path; leave <strong>UseOldJoin</strong> off.</p>
+</li>
+<li><p>Launch the main <strong>through RAM</strong>. Set the main's desired graphics, FPS cap and volume in Roblox, then close it. Wait for settings to save, then click <strong>Capture main's in-game settings now</strong>. Check the displayed values.</p>
+</li>
+<li><p>Refresh Client Profiles. <strong>Direct arguments</strong> should show <strong>URI</strong> or <strong>Switches</strong>. This observation is required once per RAM session. If it stays unverified, alts use protocol fallback and the log explains why.</p>
+</li>
+</ol>
+<h2 id="main-smoke-test">Main smoke test</h2>
+<ol>
+<li><p>After cleanup, record the hash of Bloxstrap's flags file, if it exists:</p>
+<div class="code-block"><div class="code-label">powershell</div><pre><code>$flags = &quot;$env:LOCALAPPDATA\Bloxstrap\Modifications\ClientSettings\ClientAppSettings.json&quot;
+Get-FileHash -LiteralPath $flags</code></pre></div>
+</li>
+<li><p>Launch one alt. Expect an <code>AltClient/version-...</code> folder beside <code>RAMSettings.ini</code>. Check the log for the client build or fallback reason. Verify low textures, gray sky, muted sound and the configured FPS in-game.</p>
+</li>
+<li><p>Launch three alts, then the main. Repeat with <strong>AsyncJoin</strong> enabled. Each account should match its own process. The main should retain its own graphics, FPS cap and volume.</p>
+</li>
+<li><p>From an elevated PowerShell if necessary, inspect client paths and priority:</p>
+<div class="code-block"><div class="code-label">powershell</div><pre><code>Get-Process RobloxPlayerBeta | Select-Object Id, Path, PriorityClass</code></pre></div>
+<p>Dedicated alts should run from <code>AltClient</code>; the main should run from the protocol handler's client folder (Bloxstrap Versions, or stock Roblox). Background alts should become BelowNormal with efficiency mode enabled. Unknown, protected helper and focused processes are excluded.</p>
+</li>
+<li><p>Recheck the Bloxstrap flags hash. With all alts using the dedicated path, it should match. Shared fallback temporarily patches and restores that file.</p>
+</li>
+<li><p>Close the alts. Relaunch the main through RAM. Its captured settings should still apply. Create <code>FastFlags/Default.json</code> and repeat: the main should still receive no profile.</p>
+</li>
+<li><p>Verify a client file's hard links (substitute the actual built version):</p>
+<div class="code-block"><div class="code-label">powershell</div><pre><code>fsutil hardlink list '.\AltClient\version-...\RobloxPlayerBeta.exe'</code></pre></div>
+<p>Both source and alt paths should appear. A different disk/filesystem can use copies instead; the log reports this. <code>AppSettings.xml</code> is always copied, and <code>ClientSettings</code> is always independent.</p>
+</li>
+</ol>
+<h2 id="fallback-and-recovery">Fallback and recovery</h2>
+<ul>
+<li><p>Turn <strong>Use dedicated low-graphics alt client</strong> off and launch an alt. Confirm a fallback reason in the log and restoration of the shared flags after settling.</p>
+</li>
+<li><p>In a debugger, set <code>AccountManager.CurrentVersion</code> to <code>version-uninstalled</code> and launch an alt with the dedicated setting on. Expect a version mismatch fallback. Bloxstrap can update the installed client for a later launch.</p>
+</li>
+<li><p>While a fallback launch has <code>FastFlags/.backup.json</code>, end RAM, then restart it. Expect the original shared flags and main snapshot to be restored. Use a test session for this interruption test.</p>
+</li>
+<li><p>Test stock Roblox without Bloxstrap on a separate installation. Main should keep using the registered protocol handler, and alts should find the matching stock version. Unreadable process paths conservatively prevent stale cleanup.</p>
+</li>
+</ul>
+<p>If a dedicated launch fails to produce a matched client in ten seconds, RAM reports the failure and keeps subsequent alt launches on protocol fallback for that session. Check the log and client error before trying direct launches again.</p>
+<h2 id="repeatable-fixture-checks">Repeatable fixture checks</h2>
+<p>From the repository root, in Windows PowerShell:</p>
+<div class="code-block"><div class="code-label">powershell</div><pre><code>dotnet msbuild 'RBX Alt Manager.sln' /p:Configuration=Release '/p:Platform=Any CPU' /restore
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/client-profiles.ps1</code></pre></div>
+<p>The script tests the built assembly with temporary files. It does not start Roblox or change installed client settings. It covers role/profile precedence, tracker formats, XML values, main snapshot capture and alt-value recognition, fallback merge/recovery, hard links, clone isolation, cleanup boundaries, and argument adaptation without retaining the main's ticket or join URL.</p>
+<h2 id="implementation-verification-report">Implementation verification report</h2>
+<ul>
+<li><p>Release build: passed with zero errors. Six existing warnings remain: two unawaited calls in AccountManager and four unassigned AccountBrowser fields.</p>
+</li>
+<li><p>Fixture checks: <strong>35 passed</strong>. Generated FastFlags README matches the checked-in README.</p>
+</li>
+<li><p>Live matrix scenarios 2–9: <strong>pending in-game testing</strong>. Fixture tests cover portions of clone isolation, profile exclusion and fallback recovery; they do not establish game acceptance, graphics, process matching or crash recovery during a real launch.</p>
+</li>
+<li><p>Bloxstrap command-line format: <strong>not yet verified on a main game launch</strong>. Inspection found a stock Roblox process without a raw protocol URI or the expected <code>--app</code> shape. The implementation observes a main launched through RAM and mirrors a raw URI or the supported <code>--app -t ... -j ... -b ... --launchtime=...</code> shape. Unknown shapes remain on fallback.</p>
+</li>
+<li><p>Whether Roblox saves XML on exit versus settings change: <strong>not measured</strong>. Main snapshots and delayed exit capture handle the planned writeback cases.</p>
+</li>
+<li><p>FramerateCap 15 and 20: <strong>not measured</strong>. The preset retains 30; no new FastFlags were added.</p>
+</li>
+<li><p><code>UseOldJoin</code> remains broken as documented in the plan: it prepares arguments but never calls <code>Process.Start</code>. It was not repaired.</p>
+</li>
+<li><p>Existing unrelated working files were preserved. No commit was made.</p>
+</li>
+</ul>
+
+</article>
+<footer><span>Client profiles / Setup and verification</span><a href="CLIENT-PROFILES-TESTING.md">Markdown source</a></footer>
+</main>
+</body>
+</html>

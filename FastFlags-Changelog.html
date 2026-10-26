@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Bloxstrap x RAM FastFlags</title>
+</head>
+<body>
+
+<h1>Bloxstrap x RAM: Low Graphics Alts</h1>
+<p>Changelog and setup guide for running many Roblox alts at the lowest possible graphics settings.</p>
+
+<hr>
+
+<h2>Changelog</h2>
+
+<h3>Dedicated alt client</h3>
+<ul>
+<li>Main is an explicit group (configurable in Client Profiles). Main and numbered Main groups never receive profiles, even Default.json.</li>
+<li>Dedicated alts run from AltClient\&lt;version-guid&gt;, with hard-linked game files and independent ClientSettings and AppSettings.xml. Your Bloxstrap flags remain untouched on this path.</li>
+<li>Launch the main through RAM once per session to verify URI or supported switch arguments. Until verified, or if an installed version is missing, alts use the shared merge and restore fallback.</li>
+<li>FastFlags\Main.settings.json preserves your main's graphics, FPS and volume. The launch gate waits for the new client to read settings, then restores the snapshot.</li>
+<li>Client Profiles adds cleanup with backup and confirmation, manual main capture, version and role status, optional window size, and optional BelowNormal priority / EcoQoS for background alts.</li>
+<li>The low graphics preset remains unchanged, including its 30 FPS cap. Values below 30 require in-game verification.</li>
+</ul>
+<p>The following older entries describe the shared fallback. XML now uses the main snapshot rather than temporary XML backups.</p>
+
+<h3>Important: Roblox FastFlag allowlist</h3>
+<p>Since September 2025, Roblox only applies FastFlags that are on its official allowlist. Any other flag in ClientAppSettings.json is silently ignored. Bloxstrap writes to the same file, so it cannot get around this.</p>
+<p>Source: <a href="https://devforum.roblox.com/t/allowlist-for-local-client-configuration-via-fast-flags/3966569">Roblox DevForum: Allowlist for local client configuration via Fast Flags</a></p>
+<p>As a result:</p>
+<ul>
+<li>DFIntTaskSchedulerTargetFps (the FPS cap flag) no longer works. RAM's "Unlock FPS" setting no longer has an effect.</li>
+<li>FFlagDisablePostFx, FIntRenderShadowIntensity and FIntRenderLocalLightUpdatesMax/Min no longer work.</li>
+<li>DFIntTextureQualityOverride only works if DFFlagTextureQualityOverrideEnabled is also set to True.</li>
+</ul>
+<p>To make up for this, RAM now also lowers Roblox's own in-game settings (graphics quality, FPS cap, volume) for alts.</p>
+
+<h3>Bloxstrap detection</h3>
+<ul>
+<li>RAM checks which program opens roblox-player: links.</li>
+<li>If it is Bloxstrap (or a fork with a Modifications folder, such as Fishstrap or Voidstrap), RAM writes FastFlags only to Bloxstrap\Modifications\ClientSettings\ClientAppSettings.json. Bloxstrap copies this folder into Roblox every time it launches.</li>
+<li>Otherwise RAM writes to the Roblox version folders, as before.</li>
+</ul>
+
+<h3>Merge instead of replace</h3>
+<ul>
+<li>Before, RAM overwrote your whole ClientAppSettings.json with the group's file, so your own flags were lost.</li>
+<li>Now RAM keeps your flags and adds the group's flags on top. When both set the same flag, the group's value wins.</li>
+</ul>
+
+<h3>Automatic backup and restore</h3>
+<ul>
+<li>The first time an alt profile is applied, RAM saves your original ClientAppSettings.json to FastFlags\.backup.json.</li>
+<li>Your originals are restored:
+  <ul>
+  <li>at the launch gate settle point (with a 15 second launcher notification timer as a backup),</li>
+  <li>immediately when an account with no matching group file launches (your main),</li>
+  <li>when RAM closes,</li>
+  <li>at the next RAM startup, if RAM crashed while a profile was applied.</li>
+  </ul>
+</li>
+<li>If a restore fails, the backup is kept so the next restore can try again.</li>
+</ul>
+
+<h3>In-game settings (_RobloxSettings)</h3>
+<ul>
+<li>A group JSON file can contain a "_RobloxSettings" object.</li>
+<li>Its values are written into %LocalAppData%\Roblox\GlobalBasicSettings_13.xml, which holds Roblox's in-game settings.</li>
+<li>RAM removes this object before writing the FastFlags, so Roblox never sees it as a flag.</li>
+<li>Only settings that already exist in the file are changed. Unknown names are skipped and logged.</li>
+</ul>
+
+<h3>Low graphics preset button</h3>
+<ul>
+<li>New button in Settings, Miscellaneous tab: "Create Low Gfx Preset".</li>
+<li>It writes FastFlags\Alts.json, asks before overwriting an existing one, and turns on Group-Based FastFlags.</li>
+<li>The preset uses only allowlisted flags.</li>
+</ul>
+
+<h3>Files changed</h3>
+<ul>
+<li>RBX Alt Manager/Classes/ClientSettingsPatcher.cs (rewritten)</li>
+<li>RBX Alt Manager/Classes/Account.cs (restore timer starts after launch)</li>
+<li>RBX Alt Manager/AccountManager.cs (restore on startup and on close)</li>
+<li>RBX Alt Manager/Forms/SettingsForm.cs and SettingsForm.Designer.cs (preset button)</li>
+<li>FastFlags/README.txt (updated guide)</li>
+</ul>
+
+<hr>
+
+<h2>Setup Tutorial</h2>
+
+<ol>
+<li>Close all Roblox clients. Open Settings &gt; Miscellaneous &gt; Client Profiles and click <strong>Clean Bloxstrap flags</strong>. Review the removed keys and keep the backup.</li>
+<li>Put your main account in group <strong>Main</strong> (or set a different Main group in Client Profiles).</li>
+<li>Put your alt accounts in group <strong>Alts</strong>. Number prefixes such as 01 Alts also work.</li>
+<li>Click <strong>Create Low Gfx Preset</strong> in Miscellaneous. It writes Alts.json and enables Group-Based FastFlags. Enable the dedicated alt client in Client Profiles.</li>
+<li>Launch the main through RAM, set your desired graphics, FPS cap and volume, then close it. Click <strong>Capture main's in-game settings now</strong>. Launching the main also verifies its argument format for this RAM session.</li>
+<li>Enable <strong>Multi Roblox</strong>. Launch one alt, then three, then the main alongside them.</li>
+</ol>
+<p>Refresh Client Profiles status. Dedicated alts should run from AltClient; the main should run from your protocol handler's client folder. If arguments remain unverified, keep protocol fallback and check the log before relying on dedicated launches.</p>
+<p>With Default.json present, the main still gets no profile. Closing an alt and relaunching the main should retain the captured main settings. Test AsyncJoin too; the launch gate serializes shared settings writes.</p>
+<p>After Bloxstrap cleanup, record a hash of its ClientAppSettings.json before and after dedicated launches; it should be unchanged. Use <code>Get-Process RobloxPlayerBeta | Select-Object Id,Path,PriorityClass</code> to inspect client paths and background alt priority. Use <code>fsutil hardlink list &quot;AltClient\&lt;guid&gt;\RobloxPlayerBeta.exe&quot;</code> to verify hard links.</p>
+<h3>The preset (Alts.json)</h3>
+<pre>
+{
+  "DFFlagTextureQualityOverrideEnabled": "True",
+  "DFIntTextureQualityOverride": "0",
+  "DFIntDebugFRMQualityLevelOverride": "1",
+  "FIntDebugForceMSAASamples": "0",
+  "FIntFRMMinGrassDistance": "0",
+  "FIntFRMMaxGrassDistance": "0",
+  "FIntGrassMovementReducedMotionFactor": "0",
+  "DFIntCSGLevelOfDetailSwitchingDistance": "0",
+  "DFIntCSGLevelOfDetailSwitchingDistanceL12": "0",
+  "DFIntCSGLevelOfDetailSwitchingDistanceL23": "0",
+  "DFIntCSGLevelOfDetailSwitchingDistanceL34": "0",
+  "DFFlagDebugPauseVoxelizer": "True",
+  "FFlagDebugSkyGray": "True",
+  "DFFlagDisableDPIScale": "True",
+  "_RobloxSettings": {
+    "SavedQualityLevel": 1,
+    "GraphicsQualityLevel": 1,
+    "FramerateCap": 30,
+    "MasterVolume": 0
+  }
+}
+</pre>
+
+<table border="1">
+<tr><th>Setting</th><th>What it does</th></tr>
+<tr><td>DFFlagTextureQualityOverrideEnabled + DFIntTextureQualityOverride</td><td>Forces the lowest texture quality.</td></tr>
+<tr><td>DFIntDebugFRMQualityLevelOverride</td><td>Forces render quality level 1.</td></tr>
+<tr><td>FIntDebugForceMSAASamples</td><td>Turns off anti-aliasing.</td></tr>
+<tr><td>FIntFRMMinGrassDistance / FIntFRMMaxGrassDistance</td><td>Removes grass.</td></tr>
+<tr><td>FIntGrassMovementReducedMotionFactor</td><td>Stops grass movement.</td></tr>
+<tr><td>DFIntCSGLevelOfDetailSwitchingDistance (and L12, L23, L34)</td><td>Switches meshes to low detail as soon as possible.</td></tr>
+<tr><td>DFFlagDebugPauseVoxelizer</td><td>Stops lighting voxel updates, which saves CPU.</td></tr>
+<tr><td>FFlagDebugSkyGray</td><td>Replaces the skybox with plain gray.</td></tr>
+<tr><td>DFFlagDisableDPIScale</td><td>Stops scaling up the render on high-DPI screens.</td></tr>
+<tr><td>_RobloxSettings: SavedQualityLevel, GraphicsQualityLevel</td><td>Sets the in-game graphics slider to 1.</td></tr>
+<tr><td>_RobloxSettings: FramerateCap</td><td>Sets the in-game maximum frame rate.</td></tr>
+<tr><td>_RobloxSettings: MasterVolume</td><td>Mutes the alt.</td></tr>
+</table>
+
+<hr>
+
+<h2>Capacity Estimates</h2>
+<p>These are estimates, not measurements. Actual numbers depend heavily on the game.</p>
+
+<h3>Test machine</h3>
+<ul>
+<li>CPU: AMD Ryzen 9 8940HX (16 cores / 32 threads)</li>
+<li>RAM: 31 GB, with about 44 GB total memory limit (RAM plus page file)</li>
+<li>GPU: NVIDIA GeForce RTX 5060 Laptop GPU (8 GB VRAM), plus AMD Radeon 610M integrated (512 MB)</li>
+</ul>
+<p>When this was checked, 39.8 GB of the 44.3 GB memory limit was in use, because image generation and several browsers were running (Brave alone used 12.5 GB). Only about 4.5 GB was left, which is enough for roughly 4 to 8 alts. The estimates below assume those apps are closed.</p>
+
+<h3>Estimated cost per alt (preset settings: 30 FPS, lowest graphics, muted)</h3>
+<table border="1">
+<tr><th>Resource</th><th>Light game (small map, idle/AFK)</th><th>Heavy game (big map, many players)</th></tr>
+<tr><td>Memory</td><td>about 0.5 to 0.8 GB</td><td>about 1 to 1.5 GB</td></tr>
+<tr><td>CPU</td><td>about 0.5 to 1 thread</td><td>about 1.5 to 2 threads</td></tr>
+<tr><td>VRAM</td><td>about 150 to 250 MB</td><td>about 300 to 500 MB</td></tr>
+</table>
+<p>One alt running during the check used 246 MB of private memory, which fits the low end, but it may have been in a menu or freshly trimmed.</p>
+
+<h3>Estimated limit by resource</h3>
+<table border="1">
+<tr><th>Limit</th><th>Light game</th><th>Heavy game</th></tr>
+<tr><td>Memory, with browsers and image generation open</td><td>about 6 to 8</td><td>about 3 to 4</td></tr>
+<tr><td>Memory, with browsers closed (about 20 GB free)</td><td>about 25 to 35</td><td>about 13 to 18</td></tr>
+<tr><td>CPU (laptop heat lowers sustained speed)</td><td>about 30 to 40</td><td>about 12 to 18</td></tr>
+<tr><td>VRAM (8 GB)</td><td>30 or more</td><td>about 15 to 20</td></tr>
+</table>
+
+<h3>Realistic targets</h3>
+<ul>
+<li>With heavy apps open: about 5 alts.</li>
+<li>With browsers closed: about 20 to 25 alts in a light AFK-style game, or 10 to 15 in a heavy one.</li>
+<li>With a larger page file as well (for example 32 GB): 30 or more in a light game. At that point CPU heat on the laptop becomes the limit.</li>
+</ul>
+
+<h3>About the memory trimmer</h3>
+<p>Auto Trim Alt Memory reduces how much RAM each alt actively uses, which makes Task Manager numbers look lower. It does not free the memory Windows has reserved for each alt; that memory moves to the page file instead. So the trimmer reduces slowdown, but it does not raise the number of alts you can launch. A larger page file does.</p>
+
+<h3>How to run more alts</h3>
+<ol>
+<li>Close browsers, image generation and other heavy apps. This frees more memory than anything else.</li>
+<li>Enlarge the page file: System, Advanced system settings, Performance, Virtual memory.</li>
+<li>In Windows Settings, Display, Graphics, set RobloxPlayerBeta.exe to the RTX 5060. Otherwise some alts may run on the Radeon 610M, which has only 512 MB.</li>
+<li>Keep the laptop plugged in and in performance mode.</li>
+<li>Launch in batches using RAM's join delay (default 8 seconds) so startup spikes don't stack.</li>
+</ol>
+
+<h3>How to measure real numbers</h3>
+<ol>
+<li>Close heavy apps.</li>
+<li>Launch 5 alts in the game you plan to use.</li>
+<li>Wait 2 minutes.</li>
+<li>In Task Manager, Details tab, read memory and CPU for each RobloxPlayerBeta.exe.</li>
+<li>Divide your free memory by the average memory per alt to get your memory limit.</li>
+</ol>
+
+<hr>
+
+<h2>Known Limitations</h2>
+<ul>
+<li><b>Closing an alt can undo the restore.</b> Roblox saves its in-game settings when it closes, so an alt closing after the restore writes its low settings back. Launching your main through RAM fixes this. Launching your main outside RAM does not.</li>
+<li><b>The 30 FPS cap is untested.</b> Roblox may not accept every FramerateCap value. If alts don't cap at 30, change it to 60 in Alts.json.</li>
+<li><b>The allowlist can change.</b> Roblox can add or remove allowed flags at any time. If a flag stops working, check the DevForum post linked above.</li>
+<li><b>Bloxstrap flag edits during a launch can be lost.</b> If you change flags in Bloxstrap during the shared fallback while an alt profile is applied, the restore overwrites them with the backup.</li>
+<li><b>"Old join" mode is not supported.</b> The existing UseOldJoin branch never starts its prepared process; it remains unchanged.</li>
+</ul>
+
+<h2>Troubleshooting</h2>
+<ul>
+<li>Check RAM's log for lines starting with [FastFlags]. They show which file was applied, where it was written, and when originals were restored.</li>
+<li>If your main launches with low graphics, close RAM (this restores your originals) and check Step 1 again.</li>
+<li>If FastFlags\.backup.json exists while no alts are launching, a restore failed. Restart RAM to retry.</li>
+</ul>
+
+</body>
+</html>

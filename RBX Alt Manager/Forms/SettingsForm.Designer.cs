@@ -78,7 +78,10 @@ namespace RBX_Alt_Manager.Forms
             this.MaxFPSValue = new System.Windows.Forms.NumericUpDown();
             this.OverrideWithCustomCB = new System.Windows.Forms.CheckBox();
             this.GroupFastFlagsCB = new System.Windows.Forms.CheckBox();
+            this.TrimAltsMemoryCB = new System.Windows.Forms.CheckBox();
             this.OpenFastFlagsButton = new System.Windows.Forms.Button();
+            this.CreatePresetButton = new System.Windows.Forms.Button();
+            this.ClientProfilesButton = new System.Windows.Forms.Button();
             this.CustomClientSettingsDialog = new System.Windows.Forms.OpenFileDialog();
             this.ForceUpdateButton = new System.Windows.Forms.Button();
             this.SettingsLayoutPanel.SuspendLayout();
@@ -591,9 +594,13 @@ namespace RBX_Alt_Manager.Forms
             this.MiscellaneousFlowPanel.Controls.Add(this.MaxFPSValue);
             this.MiscellaneousFlowPanel.Controls.Add(this.OverrideWithCustomCB);
             this.MiscellaneousFlowPanel.Controls.Add(this.GroupFastFlagsCB);
+            this.MiscellaneousFlowPanel.Controls.Add(this.TrimAltsMemoryCB);
             this.MiscellaneousFlowPanel.Controls.Add(this.OpenFastFlagsButton);
+            this.MiscellaneousFlowPanel.Controls.Add(this.CreatePresetButton);
+            this.MiscellaneousFlowPanel.Controls.Add(this.ClientProfilesButton);
             this.MiscellaneousFlowPanel.Controls.Add(this.ForceUpdateButton);
             this.MiscellaneousFlowPanel.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.MiscellaneousFlowPanel.AutoScroll = true;
             this.MiscellaneousFlowPanel.Location = new System.Drawing.Point(3, 3);
             this.MiscellaneousFlowPanel.Name = "MiscellaneousFlowPanel";
             this.MiscellaneousFlowPanel.Padding = new System.Windows.Forms.Padding(12);
@@ -719,15 +726,43 @@ namespace RBX_Alt_Manager.Forms
             this.GroupFastFlagsCB.UseVisualStyleBackColor = true;
             this.GroupFastFlagsCB.CheckedChanged += new System.EventHandler(this.GroupFastFlagsCB_CheckedChanged);
             // 
+            // TrimAltsMemoryCB
+            // 
+            this.TrimAltsMemoryCB.AutoSize = true;
+            this.TrimAltsMemoryCB.Location = new System.Drawing.Point(15, 107);
+            this.TrimAltsMemoryCB.Margin = new System.Windows.Forms.Padding(3, 3, 60, 3);
+            this.TrimAltsMemoryCB.Name = "TrimAltsMemoryCB";
+            this.TrimAltsMemoryCB.Size = new System.Drawing.Size(160, 17);
+            this.TrimAltsMemoryCB.TabIndex = 14;
+            this.TrimAltsMemoryCB.Text = "Auto Trim Alt Memory";
+            this.TrimAltsMemoryCB.UseVisualStyleBackColor = true;
+            this.TrimAltsMemoryCB.CheckedChanged += new System.EventHandler(this.TrimAltsMemoryCB_CheckedChanged);
+            // 
             // OpenFastFlagsButton
             // 
             this.OpenFastFlagsButton.Location = new System.Drawing.Point(15, 107);
             this.OpenFastFlagsButton.Name = "OpenFastFlagsButton";
-            this.OpenFastFlagsButton.Size = new System.Drawing.Size(269, 23);
-            this.OpenFastFlagsButton.TabIndex = 14;
+            this.OpenFastFlagsButton.Size = new System.Drawing.Size(131, 23);
+            this.OpenFastFlagsButton.TabIndex = 15;
             this.OpenFastFlagsButton.Text = "Open FastFlags Folder";
             this.OpenFastFlagsButton.UseVisualStyleBackColor = true;
             this.OpenFastFlagsButton.Click += new System.EventHandler(this.OpenFastFlagsButton_Click);
+            // 
+            // CreatePresetButton
+            // 
+            this.CreatePresetButton.Location = new System.Drawing.Point(153, 107);
+            this.CreatePresetButton.Name = "CreatePresetButton";
+            this.CreatePresetButton.Size = new System.Drawing.Size(131, 23);
+            this.CreatePresetButton.TabIndex = 16;
+            this.CreatePresetButton.Text = "Create Low Gfx Preset";
+            this.CreatePresetButton.UseVisualStyleBackColor = true;
+            this.CreatePresetButton.Click += new System.EventHandler(this.CreatePresetButton_Click);
+            this.ClientProfilesButton.Name = "ClientProfilesButton";
+            this.ClientProfilesButton.Size = new System.Drawing.Size(269, 23);
+            this.ClientProfilesButton.TabIndex = 17;
+            this.ClientProfilesButton.Text = "Client Profiles...";
+            this.ClientProfilesButton.UseVisualStyleBackColor = true;
+            this.ClientProfilesButton.Click += new System.EventHandler(this.ClientProfilesButton_Click);
             // 
             // CustomClientSettingsDialog
             // 
@@ -740,7 +775,7 @@ namespace RBX_Alt_Manager.Forms
             this.ForceUpdateButton.Location = new System.Drawing.Point(15, 84);
             this.ForceUpdateButton.Name = "ForceUpdateButton";
             this.ForceUpdateButton.Size = new System.Drawing.Size(269, 23);
-            this.ForceUpdateButton.TabIndex = 16;
+            this.ForceUpdateButton.TabIndex = 18;
             this.ForceUpdateButton.Text = "Force Update";
             this.ForceUpdateButton.UseVisualStyleBackColor = true;
             this.ForceUpdateButton.Click += new System.EventHandler(this.ForceUpdateButton_Click);
@@ -825,7 +860,10 @@ namespace RBX_Alt_Manager.Forms
         private System.Windows.Forms.OpenFileDialog CustomClientSettingsDialog;
         private System.Windows.Forms.CheckBox AutoCookieRefreshCB;
         private System.Windows.Forms.CheckBox GroupFastFlagsCB;
+        private System.Windows.Forms.CheckBox TrimAltsMemoryCB;
         private System.Windows.Forms.Button OpenFastFlagsButton;
+        private System.Windows.Forms.Button CreatePresetButton;
+        private System.Windows.Forms.Button ClientProfilesButton;
         private System.Windows.Forms.Button ForceUpdateButton;
     }
 }

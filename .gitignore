@@ -332,3 +332,7 @@ __pycache__/
 *.xsd.cs
 
 # OpenCover UI anal
+
+# Dedicated local Roblox client cache
+/AltClient/
+/tests/.scratch-*/

@@ -59,6 +59,7 @@ namespace RBX_Alt_Manager.Forms
             }
 
             GroupFastFlagsCB.Checked = AccountManager.General.Get<bool>("GroupFastFlags");
+            TrimAltsMemoryCB.Checked = AccountManager.Watcher.Get<bool>("TrimAltsMemory");
 
             try { StartupKey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true); } catch { }
 
@@ -364,8 +365,46 @@ namespace RBX_Alt_Manager.Forms
             AccountManager.IniSettings.Save("RAMSettings.ini");
         }
 
+        private void TrimAltsMemoryCB_CheckedChanged(object sender, EventArgs e)
+        {
+            if (!SettingsLoaded) return;
+
+            RobloxWatcher.AutoTrimAltsMemory = TrimAltsMemoryCB.Checked;
+            AccountManager.Watcher.Set("TrimAltsMemory", TrimAltsMemoryCB.Checked ? "true" : "false");
+            AccountManager.IniSettings.Save("RAMSettings.ini");
+        }
+
         private void OpenFastFlagsButton_Click(object sender, EventArgs e)
         {
+            ClientSettingsPatcher.OpenFastFlagsFolder();
+        }
+
+        private void ClientProfilesButton_Click(object sender, EventArgs e)
+        {
+            using (var profiles = new ClientProfilesForm(this)) profiles.ShowDialog(this);
+        }
+
+        private void CreatePresetButton_Click(object sender, EventArgs e)
+        {
+            string path = Path.Combine(ClientSettingsPatcher.FastFlagsDirectory, "Alts.json");
+
+            if (File.Exists(path) && !Utilities.YesNoPrompt("Low Graphics Preset", "Alts.json already exists", "Overwrite it with the low graphics preset?", false))
+                return;
+
+            try
+            {
+                ClientSettingsPatcher.CreateLowGraphicsPreset();
+            }
+            catch (Exception x)
+            {
+                MessageBox.Show($"Failed to create preset: {x.Message}", "Roblox Account Manager", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (!GroupFastFlagsCB.Checked) GroupFastFlagsCB.Checked = true;
+
+            MessageBox.Show("Created FastFlags\\Alts.json.\n\nAccounts in a group named 'Alts' (or e.g. '01 Alts') will launch with it. Rename the file to match a different group.", "Roblox Account Manager", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
             ClientSettingsPatcher.OpenFastFlagsFolder();
         }
 

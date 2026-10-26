@@ -1,0 +1,4 @@
+Problem 1:
+
+Google being RAM's default log-in agent is flagged by Roblox's detection, resulting in my log-in needing three 8-step verification puzzles, and a 2FA log-in. How do we implement a browser switch feature here? E.g. making Brave the log-in agent instead, and does that solve the problem?
+

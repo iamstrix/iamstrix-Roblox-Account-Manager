@@ -7,6 +7,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Timers;
+using System.Threading.Tasks;
 
 namespace RBX_Alt_Manager.Classes
 {
@@ -33,6 +34,51 @@ namespace RBX_Alt_Manager.Classes
         public static readonly string HandlePath = Path.Combine(Environment.CurrentDirectory, "handle.bin");
 
         public static HashSet<int> Seen = new HashSet<int>();
+        private static readonly HashSet<int> EfficiencyHandled = new HashSet<int>();
+        private static readonly HashSet<int> MainExitHandled = new HashSet<int>();
+        private static readonly object ProcessLock = new object();
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PowerThrottlingState { public uint Version, ControlMask, StateMask; }
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetProcessInformation(IntPtr process, int informationClass, ref PowerThrottlingState information, uint size);
+
+        private static void ApplyEfficiency(Process process)
+        {
+            lock (ProcessLock) if (!EfficiencyHandled.Add(process.Id)) return;
+            try
+            {
+                process.PriorityClass = ProcessPriorityClass.BelowNormal;
+                var state = new PowerThrottlingState { Version = 1, ControlMask = 1, StateMask = 1 };
+                if (!SetProcessInformation(process.Handle, 4, ref state, (uint)Marshal.SizeOf(state)))
+                    Program.Logger.Info("[FastFlags] EcoQoS unavailable for PID " + process.Id + ": " + Marshal.GetLastWin32Error());
+            }
+            catch (Exception ex) { Program.Logger.Info("[FastFlags] Efficiency mode unavailable for PID " + process.Id + ": " + ex.Message); }
+        }
+
+        private static void WatchMainExit(Process process)
+        {
+            lock (ProcessLock) if (!MainExitHandled.Add(process.Id)) return;
+            int pid = process.Id;
+            try
+            {
+                var watched = Process.GetProcessById(pid);
+                watched.Exited += async (s, e) =>
+                {
+                    try
+                    {
+                        await Task.Delay(2000);
+                        await ClientProfiles.LaunchGate.WaitAsync();
+                        try { ClientProfiles.CaptureMainSnapshot(true); }
+                        finally { ClientProfiles.LaunchGate.Release(); }
+                    }
+                    catch (Exception ex) { Program.Logger.Error("[FastFlags] Main exit snapshot: " + ex.Message); }
+                    finally { lock (ProcessLock) MainExitHandled.Remove(pid); watched.Dispose(); }
+                };
+                watched.EnableRaisingEvents = true;
+            }
+            catch { lock (ProcessLock) MainExitHandled.Remove(pid); }
+        }
         public static List<RobloxProcess> Instances = new List<RobloxProcess>();
         public static bool VerifyDataModel = true;
         public static bool IgnoreExistingProcesses = true;
@@ -63,11 +109,12 @@ namespace RBX_Alt_Manager.Classes
         public static void CheckProcesses()
         {
             IntPtr Focused = GetForegroundWindow();
+            var processes = Process.GetProcessesByName("RobloxPlayerBeta");
+            var liveIds = new HashSet<int>(processes.Select(p => p.Id));
+            lock (ProcessLock) EfficiencyHandled.RemoveWhere(pid => !liveIds.Contains(pid));
 
-            foreach (var process in Process.GetProcessesByName("RobloxPlayerBeta"))
+            foreach (var process in processes)
             {
-                if (process.MainWindowHandle == Focused) continue; // Entirely ignore focused windows
-
                 void Kill(string Reason) { Program.Logger.Info($"Attempting to kill process {process.Id}, reason: {Reason}"); try { process.Kill(); } catch { } }
 
                 string CommandLine = process.GetCommandLine();
@@ -77,14 +124,18 @@ namespace RBX_Alt_Manager.Classes
                 if (CommandLine.StartsWith("\\??\\")) continue; // Roblox's second process
                 if (CommandLine.Contains("--launch-to-tray")) continue; // Roblox background helper
 
-                var TrackerMatch = Regex.Match(CommandLine, @"\-b (\d+)");
-                string TrackerID = TrackerMatch.Success ? TrackerMatch.Groups[1].Value : string.Empty;
+                string TrackerID = Utilities.GetBrowserTrackerId(CommandLine);
 
                 Account account = null;
                 if (!string.IsNullOrEmpty(TrackerID))
                     account = AccountManager.AccountsList.FirstOrDefault(a => a.BrowserTrackerID == TrackerID);
                 if (account == null)
                     account = AccountManager.AccountsList.FirstOrDefault(a => a.ProcessId == process.Id);
+
+                ClientRole role = ClientProfiles.GetRole(account);
+                if (role == ClientRole.Main) WatchMainExit(process);
+                if (process.MainWindowHandle == Focused) continue; // Never trim or change priority on the focused window.
+                if (role == ClientRole.Alt && AccountManager.General.Get<bool>("AltEfficiencyMode")) ApplyEfficiency(process);
 
                 // If not ran with -t/-j, only proceed if this process is known to RAM or has a main window
                 if (!CommandLine.Contains("-t ") && !CommandLine.Contains("-j ") && account == null && process.MainWindowHandle == IntPtr.Zero)
@@ -102,8 +153,7 @@ namespace RBX_Alt_Manager.Classes
 
                         if (AutoTrimAltsMemory)
                         {
-                            bool isMain = account != null && !string.IsNullOrEmpty(account.Group) && account.Group.Equals("Main", StringComparison.OrdinalIgnoreCase);
-                            if (!isMain)
+                            if (account != null && role == ClientRole.Alt)
                             {
                                 try
                                 {

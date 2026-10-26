@@ -118,6 +118,11 @@ namespace RBX_Alt_Manager
             Watcher = IniSettings.Section("Watcher");
             Prompts = IniSettings.Section("Prompts");
 
+            if (!General.Exists("MainGroup")) General.Set("MainGroup", "Main");
+            if (!General.Exists("UseAltClient")) General.Set("UseAltClient", Bloxstrap.IsInstalled || ClientSettingsPatcher.GetClientSettingsDirectories().Count > 0 ? "true" : "false");
+            if (!General.Exists("AltEfficiencyMode")) General.Set("AltEfficiencyMode", General.Get<bool>("UseAltClient") ? "true" : "false");
+            if (!General.Exists("AltWindowWidth")) General.Set("AltWindowWidth", "0");
+            if (!General.Exists("AltWindowHeight")) General.Set("AltWindowHeight", "0");
             if (!General.Exists("CheckForUpdates")) General.Set("CheckForUpdates", "true");
             if (!General.Exists("AccountJoinDelay")) General.Set("AccountJoinDelay", "8");
             if (!General.Exists("AsyncJoin")) General.Set("AsyncJoin", "false");
@@ -675,6 +680,10 @@ namespace RBX_Alt_Manager
 
             PlaceID.Text = General.Exists("SavedPlaceId") ? General.Get("SavedPlaceId") : "5315046213";
             UserID.Text = General.Exists("SavedFollowUser") ? General.Get("SavedFollowUser") : string.Empty;
+
+            RobloxWatcher.AutoTrimAltsMemory = Watcher.Get<bool>("TrimAltsMemory");
+
+            try { ClientSettingsPatcher.RestoreOriginals(); } catch (Exception x) { Program.Logger.Error($"Failed to restore original ClientAppSettings: {x}"); } // in case RAM closed while an alt profile was applied
 
             if (!Developer.Get<bool>("DevMode"))
             {
@@ -1600,6 +1609,8 @@ namespace RBX_Alt_Manager
             }
 
             AltManagerWS?.Stop();
+
+            try { ClientSettingsPatcher.RestoreOriginals(); } catch { }
 
             if (PlaceID == null || string.IsNullOrEmpty(PlaceID.Text)) return;
 

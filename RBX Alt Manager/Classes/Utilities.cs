@@ -1,4 +1,4 @@
-﻿using BrightIdeasSoftware;
+using BrightIdeasSoftware;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -24,6 +24,11 @@ using System.Windows.Forms;
 
 public static class Utilities
 {
+    public static string GetBrowserTrackerId(string commandLine)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(commandLine ?? "", @"(?:\-b\s+|browsertrackerid[:=])(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success ? match.Groups[1].Value : string.Empty;
+    }
     [DllImport("user32.dll")]
     public static extern bool PostMessage(IntPtr hWnd, UInt32 Msg, int wParam, int lParam);
 

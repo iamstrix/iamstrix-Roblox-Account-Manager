@@ -387,6 +387,10 @@
     <Compile Include="Classes\Batch.cs" />
     <Compile Include="Classes\AccountBrowser.cs" />
     <Compile Include="Classes\ClientSettingsPatcher.cs" />
+    <Compile Include="Classes\ClientProfiles.cs" />
+    <Compile Include="Classes\Bloxstrap.cs" />
+    <Compile Include="Classes\AltClient.cs" />
+    <Compile Include="Forms\ClientProfilesForm.cs"><SubType>Form</SubType></Compile>
     <Compile Include="Classes\Cryptography.cs" />
     <Compile Include="Classes\MenuButton.cs">
       <SubType>Component</SubType>
