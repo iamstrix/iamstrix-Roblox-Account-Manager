@@ -336,3 +336,19 @@ __pycache__/
 # Dedicated local Roblox client cache
 /AltClient/
 /tests/.scratch-*/
+
+# Local reference copies and working notes
+/base.config
+/base_account.cs
+/g-intention.txt
+/log.txt
+
+# Downloaded build tooling
+/nuget.exe
+
+# Local HTML previews (Markdown sources remain tracked)
+/CLIENT-PROFILES-TESTING.html
+/PLAN-client-profiles.html
+
+# Unrelated local simulation
+/index.html
